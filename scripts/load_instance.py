@@ -2,7 +2,7 @@
 """
 load_instance.py
 
-Converts benchmark facility location instances from original formats (.txt or .plc)
+Converts benchmark instances from original formats (.txt or .plc)
 into a unified JSON format for reproducibility.
 
 Supports:
@@ -13,10 +13,7 @@ Usage:
     python load_instance.py <folder_path> <name> <test_set> [<capacity>]
 
 Example:
-    python load_instance.py ../raw_data i100_1 OR4 100
-
-Author: Your Name
-Date: 2025-04-29
+    python load_instance.py ../raw_data capa OR4 5000
 """
 
 import os
