@@ -25,7 +25,11 @@ We used instances from three benchmark datasets, which can be accessed through t
 3. **445 test instances** presented in:  
    Avella, P., & Boccia, M. (2009). [A cutting plane algorithm for the capacitated facility location problem](https://doi.org/10.1007/s10589-007-9117-5).  
    *Computational Optimization and Applications, 43(1), 39–65.*  
-   Instances available at [OR@Brescia](https://or-brescia.unibs.it/instances/instances_sscflp) (last accessed: 21st March 2025).
+   and 
+   Guastaroba, G., & Speranza, M. G. (2012). [Kernel search for the capacitated facility location problem](https://doi.org/10.1007/s10732-012-9212-8).  
+   *Journal of Heuristics, 18(6), 877-917.* 
+   - *TB-A* and *TB-B* instances available at [Unina](https://wpage.unina.it/sforza/test/) (last accessed: 21st March 2025).
+   - *TB-C* instances available at [OR@Brescia](https://or-brescia.unibs.it/instances/instances_sscflp) (last accessed: 21st March 2025).
 
 ---
 
@@ -53,10 +57,10 @@ The provided example file `i300_1.json` follows this format:
   "params": {
     "I": 300,
     "J": 300,
-    "D_j": [ ... ],        // List of demands for each customer
-    "Q_i": [ ... ],        // List of capacities for each facility
-    "F_i": [ ... ],        // List of fixed opening costs for each facility
-    "c_ij": [              // 2D list (matrix) of transportation costs
+    "D_j": [ ... ],        
+    "Q_i": [ ... ],        
+    "F_i": [ ... ],        
+    "c_ij": [              
       [ ... ],
       [ ... ],
       ...
