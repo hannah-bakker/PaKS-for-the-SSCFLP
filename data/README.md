@@ -57,10 +57,10 @@ The provided example file `i300_1.json` follows this format:
   "params": {
     "I": 300,
     "J": 300,
-    "D_j": [  ],  *list*      
-    "Q_i": [  ],  *list*       
-    "F_i": [  ],  *list*       
-    "c_ij": [     *2D list*          
+    "D_j": [  ],       
+    "Q_i": [  ],        
+    "F_i": [  ],        
+    "c_ij": [             
       [  ],
       [  ],
       [  ]
