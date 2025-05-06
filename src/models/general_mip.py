@@ -24,15 +24,18 @@ class MIP:
 
     def __init__(self, instance):
         """
-        Initialize the MIP model.
+        Initialize a generic MIP model.
 
-        Args:
-            instance (Instance): The problem instance containing input data.
+        Parameters
+        ----------
+        instance : Instance
+            An object containing all data relevant to the MIP model,
+            including problem parameters and metadata.
         """
-        self.instance = instance
-        self.m = Model(instance.data["info"]["name"])
-        self.dvars = dict()
-        self.constraints = dict()
+        self.instance = instance # Store the problem instance
+        self.m = Model(instance.data["info"]["name"]) # Create a new CPLEX model with a descriptive name
+        self.dvars = dict() # Dictionary to store decision variables by name
+        self.constraints = dict() # Dictionary to store constraint sets by name
 
     def solve(self, 
               log_output: bool = False,
@@ -42,24 +45,34 @@ class MIP:
         """
         Solve the MIP model with specified solver parameters.
 
-        Args:
-            log_output (bool): If True, display solver logs.
-            timelimit (int): Maximum solving time (seconds).
-            mipgap (float): Relative optimality gap tolerance.
-            conditional_timelimit (int, optional): Extended time limit if no feasible solution is found.
+        Parameters
+        ----------
+        log_output : bool, optional
+            If True, display CPLEX solver log output. Default is False.
+        timelimit : int, optional
+            Maximum solving time in seconds. Default is 3600.
+        mipgap : float, optional
+            Relative optimality gap tolerance. Default is 0.0001.
+        conditional_timelimit : int, optional
+            If set, applies this extended time limit only when no feasible solution
+            has been found within the standard timelimit.
 
-        Returns:
-            Solution: A Solution object containing results from the solve.
+        Returns
+        -------
+        Solution
+            A Solution object containing the objective value, variable values,
+            solve time, bound, and optimality metadata.
         """
         self.mipgap = mipgap
         self.timelimit = timelimit
 
-        # Set solving parameters
+        # Configure solver behavior
         self.m.context.solver.log_output = log_output
         self.m.parameters.mip.tolerances.mipgap = self.mipgap
-        self.m.parameters.mip.display.set(4)  # Verbosity
+        self.m.parameters.mip.display.set(4)  # Set verbosity level
         self.m.log_output = log_output
 
+        # Apply conditional time limit logic (if provided)
         if conditional_timelimit is not None:
             conditional_timelimit_callback = self.m.register_callback(ConditionalTimelimitCallback)
             conditional_timelimit_callback.general_timelimit = self.timelimit
@@ -83,6 +96,7 @@ class MIP:
                 optimal=optimal,
             )
         else:
+            # Infeasible or solver failed to return a solution
             sol = Solution(
                 instance=self.instance,
                 name=str(self.m.name),
@@ -104,23 +118,24 @@ class MIP:
         """
         return dict()
 
-class SimpleCallback(cpx_cb.MIPInfoCallback):
-    """
-    Simple callback for demonstration purposes.
-    """
-
-    def __init__(self, env):
-        super().__init__(env)
-        print("SimpleCallback initialized.")
-
-    def __call__(self):
-        print("SimpleCallback triggered.")
-
 class ConditionalTimelimitCallback(cpx_cb.MIPInfoCallback):
     """
-    Custom callback to implement conditional time limits based on feasibility.
-    """
+    Custom callback to implement a two-stage time limit strategy for MIP solving.
 
+    If the solver does not find a feasible solution within `general_timelimit`,
+    the search continues until `conditional_timelimit` is reached. This helps 
+    avoid early termination in hard instances that might take longer to find 
+    a feasible solution.
+
+    Attributes
+    ----------
+    general_timelimit : float
+        Time limit (in seconds) for the first phase before checking feasibility.
+    conditional_timelimit : float
+        Total time limit (in seconds) if no feasible solution is found in the first phase.
+    timelimit_exceeded : bool
+        Tracks whether the general time limit has been passed already.
+    """
     def __init__(self, env):
         super().__init__(env)
         self.general_timelimit = 0
@@ -128,9 +143,14 @@ class ConditionalTimelimitCallback(cpx_cb.MIPInfoCallback):
         self.timelimit_exceeded = False
 
     def __call__(self):
+        """
+        Check elapsed time and decide whether to stop the solver 
+        based on feasibility and configured time limits.
+        """
         elapsed_time = self.get_time() - self.get_start_time()
 
         if elapsed_time > self.general_timelimit:
+            # If no feasible solution found yet
             if not self.has_incumbent():
                 if not self.timelimit_exceeded:
                     print(
@@ -143,4 +163,5 @@ class ConditionalTimelimitCallback(cpx_cb.MIPInfoCallback):
                     print(f"Conditional timelimit {self.conditional_timelimit}s reached. Stopping search.")
                     self.abort()
             else:
+                 # If a solution has been found in the meantime, stop as usual
                 self.abort()

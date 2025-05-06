@@ -18,9 +18,11 @@ class Instance:
     def __init__(self, path: str):
         """
         Initialize an instance by loading data from a JSON file.
-
-        Args:
-            path (str): Path to the JSON file containing the instance data.
+        
+        Parameters
+        ----------
+        path : str, optional
+            Path to the JSON file containing the instance data.
         """
         with open(path, 'r') as json_file:
             self.data = json.load(json_file)
@@ -32,17 +34,33 @@ class Instance:
                   I_IDs: list = None, J_IDs: list = None, title: str = "Instance",
                   png: bool = False, legend: bool = True, no_customers: bool = False):
         """
-        Visualize the instance using plotting utilities.
+        Visualize the SSCFLP instance with optional facility and customer selection.
 
-        Args:
-            path (str, optional): Path where the plot should be saved. If None, the plot is shown.
-            size (float, optional): Plot size scaling factor.
-            I_IDs (list, optional): Subset of facility IDs to visualize.
-            J_IDs (list, optional): Subset of customer IDs to visualize.
-            title (str, optional): Title for the plot.
-            png (bool, optional): Save as PNG if True, else save as PDF.
-            legend (bool, optional): Show legend if True.
-            no_customers (bool, optional): Do not plot customers if True.
+        Uses the SSCFLPPlot utility to create a visual representation of the instance.
+        Allows selective plotting and configurable output.
+
+        Parameters
+        ----------
+        path : str, optional
+            If provided, saves the plot to this file path. Otherwise, displays the plot interactively.
+        size : float, optional
+            Scaling factor for the plot dimensions (default is 0.5).
+        I_IDs : list of int, optional
+            Subset of facility indices to display. If None, all are shown.
+        J_IDs : list of int, optional
+            Subset of customer indices to display. If None, all are shown.
+        title : str, optional
+            Title displayed on the plot (default is "Instance").
+        png : bool, optional
+            If True, saves the plot as a PNG file. If False, saves as PDF.
+        legend : bool, optional
+            Whether to display a legend (default is True).
+        no_customers : bool, optional
+            If True, do not plot customer nodes (default is False).
+
+        Returns
+        -------
+        None
         """
         plot = SSCFLPPlot(size=size)
         plot._add_subplot(self, I_IDs=I_IDs, J_IDs=J_IDs,
@@ -55,11 +73,13 @@ class Instance:
 
     def store(self, path: str = None):
         """
-        Store the instance data back into a JSON file.
+        Store the instance data to a JSON file.
 
-        Args:
-            path (str, optional): Path where the instance should be stored.
-                                  If None, uses the original loaded path.
+        Parameters
+        ----------
+        path : str, optional
+            Destination file path to store the instance. If None, uses the original
+            path from the instance metadata ('info' field in self.data).
         """
         if path is None:
             path = self.data["info"]["path"]

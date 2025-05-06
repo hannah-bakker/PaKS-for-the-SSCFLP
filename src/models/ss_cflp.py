@@ -3,12 +3,11 @@
 ss_cflp.py
 
 Defines the SS_CFLP class, which models the single-source capacitated facility location problem
-(SSCFLP) as a mixed-integer program using CPLEX. It extends the base MIP class with problem-specific
-constraints, valid inequalities, linear relaxations, and kernel-based heuristics.
-
+(SSCFLP) as a mixed-integer program using docplex. It extends the base MIP class with problem-specific
+constraints, and methods used throughout PaKS and KS2014 to identify solutions to LP relaxations and add or 
+remove constraints in restricted BIPs.
 """
 
-import time
 import numpy as np
 from docplex.mp.relax_linear import LinearRelaxer as LR
 from ..model.general_mip import MIP
@@ -16,9 +15,8 @@ from ..model.solution import Solution
 
 class SS_CFLP(MIP):
     """
-    SSCFLP model class extending the base MIP. Models x_ij and y_i decision variables for
-    assignment and facility opening. Supports optional valid inequalities, kernel and bucket constraints,
-    and LP-based decomposition.
+    SSCFLP model class extending the base MIP. 
+    
     """
 
     NAME = "SS_CFLP"
@@ -27,32 +25,37 @@ class SS_CFLP(MIP):
         """
         Initialize the SSCFLP model.
 
-        Args:
-            instance: The Instance object containing problem data.
-            verbose (bool, optional): Enable verbose logging. Defaults to True.
+        Parameters
+        ----------
+        instance : object
+            Problem instance data.
+        verbose : bool
+            If True, prints detailed logs. Default is True.
         """
         super().__init__(instance)
         self.verbose = verbose
+
+        # Basic sets and index lists
         self.I = list(range(instance.data["params"]["I"]))
         self.J = list(range(instance.data["params"]["J"]))
         self.IJ = [(i, j) for i in self.I for j in self.J]
-        self.N = 0  # Number of additional LP relaxations
-        self.N_suggested = 0
-        self.LP_times = dict()
+        
         self._build(instance.data["params"])
 
     def _build(self, params: dict) -> None:
         """
-        Define the SSCFLP model: variables, constraints, and objective function.
+        Construct SSCFLP model: variables, constraints, objective function.
 
-        Args:
-            params (dict): Dictionary containing instance parameters.
+        Parameters
+        ----------
+        params : dict
+            Instance parameters (e.g., demand, cost, capacity).
         """
         # Decision variables
         self.dvars["y"] = self.m.binary_var_dict(self.I, name="y_%s")
         self.dvars["x"] = self.m.binary_var_dict(self.IJ, name="x_%s")
 
-        # Demand satisfaction constraints
+        # Constraint: each customer is served by at least one facility
         self.m.add_constraints(
             (
                 self.m.sum(self.dvars["x"][i, j] for i in self.I) >= 1.0
@@ -61,7 +64,7 @@ class SS_CFLP(MIP):
             names=[f"dem_sat_{j}" for j in self.J],
         )
 
-        # Capacity constraints
+        # Constraint: total demand served by a facility must not exceed its capacity
         self.m.add_constraints(
             (
                 self.m.sum(
@@ -73,7 +76,7 @@ class SS_CFLP(MIP):
             names=[f"cap_lim_{i}" for i in self.I],
         )
 
-        # Objective function: fixed + variable costs
+        # Objective: minimize fixed and variable cost
         self.fixed_cost = self.m.sum(params["F_i"][i] * self.dvars["y"][i] for i in self.I)
         self.var_cost = self.m.sum(
             params["c_ij"][i][j] * self.dvars["x"][i, j] * params["D_j"][j]
@@ -84,8 +87,11 @@ class SS_CFLP(MIP):
         
     def _add_VIs(self) -> None:
         """
-        Add valid inequalities of the form x_ij <= y_i.
+        Add valid inequalities (4) of the form x_ij <= y_i.
         These ensure that a facility must be opened if it serves a customer.
+
+        Updates self.constraints by adding a "VIs" entry that stores the added constraints.
+        This allows for easy removal later if needed.
         """
         self.constraints["VIs"] = self.m.add_constraints(
             (self.dvars["x"][i, j] <= self.dvars["y"][i] for (i, j) in self.IJ),
@@ -95,6 +101,10 @@ class SS_CFLP(MIP):
     def _remove_VIs(self) -> None:
         """
         Remove the valid inequalities (x_ij <= y_i) from the model.
+
+        Modifies:
+        - self.m: by removing the constraints from the CPLEX model.
+        - self.constraints: by deleting the "VIs" entry.
         """
         if "VIs" in self.constraints:
             self.m.remove_constraints(self.constraints["VIs"])
@@ -104,9 +114,12 @@ class SS_CFLP(MIP):
         """
         Add an upper bound constraint on the objective during kernel search.
 
-        Args:
-            z_H (float): Current upper bound on the objective value.
-            iteration (int): Iteration number for naming the constraint.
+        Parameters
+        ----------
+        z_H : float
+            The current best (incumbent) objective value.
+        iteration : int
+            Iteration number, used for naming the constraint uniquely.
         """
         self.m.add_constraint(
             self.objective <= z_H,
@@ -117,9 +130,16 @@ class SS_CFLP(MIP):
         """
         Enforce that at least one facility in the current bucket is opened.
 
-        Args:
-            B_y (list[int]): List of facility indices (y variables) in the bucket.
-            iteration (int, optional): For naming the constraint.
+        Modifies:
+            - self.constraints["use_bucket"]: Stores the created constraint object.
+            - self.m: Adds a constraint to the model.
+
+        Parameters
+        ----------
+        B_y : list[int]
+            Indices of facilities (i ∈ I) in the current bucket.
+        iteration : int, optional
+            Iteration index used for naming the constraint uniquely.      
         """
         self.constraints["use_bucket"] = self.m.add_constraint(
             self.m.sum(self.dvars["y"][i] for i in B_y) >= 1.0,
@@ -129,6 +149,10 @@ class SS_CFLP(MIP):
     def _remove_enforcing_of_previous_bucket(self) -> None:
         """
         Remove the constraint enforcing use of a facility from a previous bucket.
+
+        Modifies:
+        - self.m: Removes the constraint from the model.
+        - self.constraints: Deletes the "use_bucket" entry.
         """
         if "use_bucket" in self.constraints:
             self.m.remove(self.constraints["use_bucket"])
@@ -142,19 +166,30 @@ class SS_CFLP(MIP):
         """
         Restrict variable upper bounds based on kernel and bucket membership.
 
-        Args:
-            B_previous (dict): Previous bucket (keys: 'x', 'y').
-            B (dict): Current bucket (keys: 'x', 'y').
-            K_plus (dict): Added kernel variables (keys: 'x', 'y').
-            K_minus (dict): Removed kernel variables (keys: 'x', 'y').
+        This method disables (sets UB = 0) for variables that were either in the 
+        previous bucket or have been removed from the kernel, and enables (sets UB = 1) 
+        for variables in the current bucket and those newly added to the kernel.
+
+        Parameters
+        ----------
+        B_previous : dict
+            Dictionary with keys 'x' and 'y' listing assignment and facility variables 
+            from the previous bucket whose upper bounds will be set to 0.
+        B : dict
+            Dictionary with keys 'x' and 'y' listing variables in the current bucket 
+            whose upper bounds will be enabled (set to 1).
+        K_plus : dict
+            Variables newly added to the kernel; their upper bounds will be set to 1.
+        K_minus : dict
+            Variables removed from the kernel; their upper bounds will be set to 0.
         """
-        # Deactivate previous and removed variables
+        # Deactivate variables from previous bucket and those removed from the kernel
         self.m.change_var_upper_bounds([self.dvars['x'][ij] for ij in B_previous['x']], ubs=0)
         self.m.change_var_upper_bounds([self.dvars['y'][i] for i in B_previous['y']], ubs=0)
         self.m.change_var_upper_bounds([self.dvars['x'][ij] for ij in K_minus['x']], ubs=0)
         self.m.change_var_upper_bounds([self.dvars['y'][i] for i in K_minus['y']], ubs=0)
 
-        # Activate current and added variables
+        # Activate variables from the current bucket and those added to the kernel
         self.m.change_var_upper_bounds([self.dvars['x'][ij] for ij in B['x']], ubs=1)
         self.m.change_var_upper_bounds([self.dvars['y'][i] for i in B['y']], ubs=1)
         self.m.change_var_upper_bounds([self.dvars['x'][ij] for ij in K_plus['x']], ubs=1)
@@ -166,41 +201,70 @@ class SS_CFLP(MIP):
         """
         Extract solution values from model decision variables.
 
-        Args:
-            dvars (dict): Dictionary of decision variables. 
+        This method reads the `.solution_value` from the CPLEX variables for each 
+        variable in the 'y' and optionally in the 'x' dictionary. It returns a plain 
+        Python dictionary of values, which can be used for reporting or post-processing.
 
-        Returns:
-            dict: Dictionary containing variable values for 'x' and 'y'.
+        Parameters
+        ----------
+        dvars : dict
+            Dictionary of CPLEX decision variables, with keys "y" (facility open) 
+            and optionally "x" (assignments). Each value is a dict of variables.
+
+        Returns
+        -------
+        dict
+            A dictionary with keys "y" and optionally "x", where:
+            - "y" maps facility indices to their solution values (float).
+            - "x" maps (i, j) index pairs to their solution values (float).
         """
-        solution_dvars = dict()        
-        solution_dvars["y"] = {i: dvars["y"][i].solution_value for i in dvars["y"].keys()}
+        solution_dvars = {}
+
+        # Extract solution values for facility open variables
+        solution_dvars["y"] = {
+            i: dvars["y"][i].solution_value for i in dvars["y"]
+        }
+
+        # Extract solution values for assignment variables if present
         if "x" in dvars:
-            solution_dvars["x"] = {ij: dvars["x"][ij].solution_value for ij in dvars["x"].keys()} 
-        return solution_dvars                  
+            solution_dvars["x"] = {
+                ij: dvars["x"][ij].solution_value for ij in dvars["x"]
+            }
+
+        return solution_dvars         
     
-    def _get_LR(self, timelimit: int = 3600) -> Solution:
+    def _get_LP_solution(self, timelimit: int = 3600) -> Solution:
         """
-        Solve the linear relaxation of the SSCFLP as required in standard KS.
+        Solve the linear relaxation of the SSCFLP as required in KS2014.
 
-        Args:
-            timelimit (int): Time limit for solving the LP relaxation.
+        Parameters
+        ----------
+        timelimit : int, optional
+            Maximum time in seconds to allow for solving the LP relaxation (default is 3600s).
 
-        Returns:
-            Solution: A Solution object with primal values and reduced costs.
+        Returns
+        -------
+        Solution
+            A `Solution` object containing:
+            - The objective value.
+            - Decision variable values (`dvars`).
+            - Reduced costs (`reduced_costs`).
+            - A flag for integer feasibility.
+            - Solution time and model name.
         """
-        # Add all valid inequalities to the original model
         self.log("Adding all valid inequalities...")
         self._add_VIs()
         
         self.log(f"Solving LP-relaxation with timelimit {timelimit}s...")
+        
+        # Generate and solve relaxed LP
         self.m_LR = LR.make_relaxed_model(self.m)
         self.m_LR.parameters.timelimit = timelimit
         self.m_LR.context.solver.log_output = self.verbose
-        
         feasible = self.m_LR.solve()
 
         if not feasible:
-            self.log("LP-relaxation is infeasible.")
+            self.log("LP relaxation is infeasible.")
             self._remove_VIs()
             return Solution(
                 instance=self.instance,
@@ -214,32 +278,35 @@ class SS_CFLP(MIP):
         # Extract variables
         dvar_list = [var for var in self.m_LR.iter_variables()]
 
-        y = dvar_list[:self.instance.data["params"]["I"]]
-        x_vars = sorted(dvar_list[self.instance.data["params"]["I"]:], key=lambda var: (int(var.name.split('_')[1]), int(var.name.split('_')[2])))
-        x = np.asarray(x_vars).reshape((self.instance.data["params"]["I"], self.instance.data["params"]["J"]))
-        dvars={"x":{(i,j):x[i,j] for i, j in sorted(self.dvars["x"].keys())}},
-        dvars={"x":{(i,j):x[i,j] for j in range(self.instance.data["params"]["J"]) for i in range(self.instance.data["params"]["I"])},
+         # First I variables are y_i, rest are x_ij
+        y = dvar_list[:len(self.I)]
+        x_vars = sorted(dvar_list[len(self.I):], key=lambda var: (int(var.name.split('_')[1]), int(var.name.split('_')[2])))
+        x = np.asarray(x_vars).reshape((len(self.I), len(self.J)))
+        # Build variable dictionary
+        dvars={"x":{(i,j):x[i,j] for j in range(len(self.J)) for i in range(len(self.I))},
                 "y":{i:y_val for i,y_val in enumerate(y)}}
+        # Extract numerical values
         solution_dvars = self._resolve_decisions(dvars)
             
-        # Determine if solution is integer feasible
+        # Check if the LP solution is integer-feasible
         integer_feasible = (
             all(int(v) == v for v in solution_dvars["y"].values()) and
             all(int(v) == v for v in solution_dvars["x"].values())
         )
         
-        # Get reduced costs
+        # Extract reduced costs
         reduced_costs = {
             "y": {i: rc for i, rc in enumerate(self.m_LR.reduced_costs(y))},
             "x": {
                 (i, j): val
-                for i in range(self.instance.data["params"]["I"])
+                for i in range(len(self.I))
                 for j, val in enumerate(self.m_LR.reduced_costs(x[i, :]))
             }
         }
         
         self._remove_VIs()
         
+        # Return the LP solution object
         return Solution(
             instance=self.instance,
             problem_type=self.NAME,
@@ -252,7 +319,8 @@ class SS_CFLP(MIP):
         )
 
       
-    def _get_S_LR_I_setminus_i(self, timelimit: int, VIs: str = "all", iterations_VIs: int = 2) -> dict:
+    
+    def _get_S(self, timelimit: int, num_VI: int = 5, N: int = 10, epsilon = 0.05) -> dict:
         """
         Generate LP relaxations by selectively removing facilities and solving smaller subproblems.
 
@@ -263,161 +331,234 @@ class SS_CFLP(MIP):
 
         Returns:
             dict: Dictionary containing multiple Solution objects.
-        """
-        start_time = time.time()
+        """        
         S = {}
 
-        if VIs == "all":
-            self._add_VIs()
+        # Produce the first solution s1 in S.
+        self.rho = sum(self.instance.data["params"]["Q_i"])/sum(self.instance.data["params"]["D_j"])
+        self.I_asterix = (len(self.I)/self.rho)
+
+        # Solve initial relaxation
+        self.m_LR = LR.make_relaxed_model(self.m)  # Generate linear relaxation     
+        self.m_LR.parameters.timelimit = timelimit
+        self.m_LR.context.solver.log_output = self.verbose
+        self.m_LR.solve()
+
+        dvar_list = [var for var in self.m_LR.iter_variables()]
+        x = np.asarray(dvar_list[len(self.I):]).reshape((len(self.I),len(self.J)))
+        dvars={"x":{(i,j):x[i,j] for j in range(len(self.J)) for i in range(len(self.I))},
+                "y":{i:y for i, y in enumerate(dvar_list[:len(self.I)])}}
+        solution_dvars_LR = self._resolve_decisions(dvars)
+
+            
+            
+        I_dash = len([i for i, y_i in solution_dvars_LR["y"].items() if y_i>0])
+        if I_dash < self.I_asterix:
+            self.constraints["special"] = []
+            self.constraints["special"].append(
+                    self.m.add_constraint(
+                        self.m.sum(self.dvars["y"][i] for i in range(len(self.I)))
+                        >= len(self.I) * (
+                            sum(self.instance.data["params"]["D_j"]) /
+                            sum(self.instance.data["params"]["Q_i"])
+                        )
+                    )
+                )
             self.m_LR = LR.make_relaxed_model(self.m)
-            self.log(f"Solving initial LP-relaxation with VIs (timelimit {timelimit*0.5}s)...")
             self.m_LR.solve()
-            self.LP_times["LP_0"] = time.time() - start_time
-        else:  # lazy VIs
-            self.m_LR = LR.make_relaxed_model(self.m)
-            solve_time_per_iter = timelimit * 0.5 / (iterations_VIs + 1)
-            self.log(f"Solving initial LP with lazy VIs (solve time per iteration: {solve_time_per_iter:.1f}s)...")
-            self.m_LR.solve()
-            for iter_count in range(iterations_VIs):
-                self._lazy_add_VIs()
-                self.m_LR.solve()
+            dvar_list = [var for var in self.m_LR.iter_variables()]
+            x = np.asarray(dvar_list[len(self.I):]).reshape((len(self.I),len(self.J)))
+            dvars={"x":{(i,j):x[i,j] for j in range(len(self.J)) for i in range(len(self.I))},
+                    "y":{i:y for i, y in enumerate(dvar_list[:len(self.I)])}}
+            solution_dvars_LR = self._resolve_decisions(dvars)  
+            I_dash = len([i for i, y_i in solution_dvars_LR["y"].items() if y_i>0])
+                  
+        else:
+            ell = 0
+            VIs = set()
+            while I_dash > self.I_asterix *(1 + epsilon) and ell < num_VI:
+                ell+=1
+                added = 0
+                # Enforce VIs lazily
+                for ij, xv in solution_dvars_LR["x"].items():
+                    if xv>0 and ij not in VIs:
+                        added+=1
+                        VIs.add(ij)
+                        self.m_LR.add_constraint(dvars["x"][ij]<=dvars["y"][ij[0]])
+                self.m_LR.solve()     
+                dvar_list = [var for var in self.m_LR.iter_variables()]
+                x = np.asarray(dvar_list[len(self.I):]).reshape((len(self.I),len(self.J)))
+                dvars={"x":{(i,j):x[i,j] for j in range(len(self.J)) for i in range(len(self.I))},
+                        "y":{i:y for i, y in enumerate(dvar_list[:len(self.I)])}}
+                solution_dvars_LR = self._resolve_decisions(dvars)  
+                I_dash = len([i for i, y_i in solution_dvars_LR["y"].items() if y_i>0]) 
+        
+        I_1 = [i for i, y_i in solution_dvars_LR["y"].items() if y_i>0]
+        self.log(f"Solved LP(Y U X).")   
+        
+        # Get reduced costs for the first solution
+        reduced_costs = {}
+        reduced_costs_y = self.m_LR.reduced_costs(dvars["y"].values())
+        reduced_costs["y"] = {i:val for i, val in enumerate(reduced_costs_y)}
+        reduced_costs["x"] = dict()
+        for i in range(len(self.I)):
+            reduced_costs_x_i = self.m_LR.reduced_costs(x[i,:])
+            for j, val in enumerate(reduced_costs_x_i):
+                reduced_costs["x"][(i,j)] = val     
 
-        self.log(f"Initial LP objective: {self.m_LR.solution.get_objective_value():.2f}")
-
-        # Extract reduced costs
-        dvar_list = list(self.m_LR.iter_variables())
-        I, J = self.instance.data["params"]["I"], self.instance.data["params"]["J"]
-        x_vars = np.array(dvar_list[I:]).reshape((I, J))
-        dvars = {
-            "x": {(i, j): x_vars[i, j] for i in range(I) for j in range(J)},
-            "y": {i: dvar_list[i] for i in range(I)}
-        }
-        solution_dvars = self._resolve_decisions(dvars)
-
-        # Save the first solution
+        # Save s1.                   
         S[0] = Solution(
-            instance=self.instance,
-            problem_type=self.NAME,
-            name=str(self.m_LR.name),
-            obj=self.m_LR.solution.get_objective_value(),
-            time=self.m_LR.solve_details.time,
-            dvars=solution_dvars,
-        )
-
-        # Prepare for subset LP relaxations
-        open_facilities = [i for i, val in solution_dvars["y"].items() if val > 0]
-        subsets = self._split_indices(open_facilities)
-
-        self.LP_times["LP_set"] = time.time()
+                instance = self.instance,
+                problem_type = self.problem_type,
+                name=str(self.m_LR.name),
+                obj=self.m_LR.solution.get_objective_value(),
+                time=self.m_LR.solve_details.time,
+                dvars=solution_dvars_LR,
+                reduced_costs = reduced_costs,
+                )
+        
+        # Produce solutions s2,...,sN+1 in S.
         D_total = sum(self.instance.data["params"]["D_j"])
         Q_total = sum(self.instance.data["params"]["Q_i"])
-
-        for s, subset in enumerate(subsets):
-            if not subset or not self._check_lp_feasibility(D_total, Q_total, subset):
+        
+        sublists = self._split_indices(I_1, N, epsilon)
+                
+        for s, I_n in enumerate(sublists):
+            if not I_n or not self._check_lp_feasibility(D_total, Q_total, I_n):
                 continue
-
+            
             if "remove_i" in self.constraints:
                 self.m_LR.remove_constraints(self.constraints["remove_i"])
-
-            self.constraints["remove_i"] = self.m_LR.add_constraints(
-                (dvars["y"][i] == 0 for i in subset)
-            )
-
-            if self.m_LR.solve():
+            self.constraints["remove_i"] = self.m_LR.add_constraints((dvars["y"][i] == 0 for i in I_n),)
+           
+            
+            if self.m_LR.solve(): # else None
                 solution_dvars = self._resolve_decisions(dvars)
+                 
+                 
+                 # Get reduced costs for the first solution
+                reduced_costs = {}
+                reduced_costs_y = self.m_LR.reduced_costs(dvars["y"].values())
+                reduced_costs["y"] = {i:val for i, val in enumerate(reduced_costs_y)}
+                reduced_costs["x"] = dict()
+                for i in range(len(self.I)):
+                     reduced_costs_x_i = self.m_LR.reduced_costs(x[i,:])
+                     for j, val in enumerate(reduced_costs_x_i):
+                         reduced_costs["x"][(i,j)] = val     
+                                      
                 S[len(S)] = Solution(
-                    instance=self.instance,
-                    problem_type=self.NAME,
-                    name=str(self.m_LR.name),
-                    obj=self.m_LR.solution.get_objective_value(),
-                    time=self.m_LR.solve_details.time,
-                    dvars=solution_dvars,
-                )
+                     instance = self.instance,
+                     problem_type = self.problem_type,
+                     name=str(self.m_LR.name),
+                     obj=self.m_LR.solution.get_objective_value(),
+                     time=self.m_LR.solve_details.time,
+                     dvars=solution_dvars,
+                     reduced_costs = reduced_costs,
+                     )    
 
-        self.LP_times["LP_set"] = time.time() - self.LP_times["LP_set"]
-
-        if VIs == "all":
-            self._remove_VIs()
-
+        if "special" in self.constraints:
+            self.m.remove_constraints(self.constraints["special"]) 
+     
         return S
     
-    def log(self, message: str) -> None:
+    def log(self, message):
         """
-        Print a log message if verbose mode is enabled.
-
-        Args:
-            message (str): Log message.
+        Log a message if verbose mode is enabled.
+        
+        Parameters
+        ----------
+        message : str
+            The message to log.
         """
-        if self.verbose:
-            print(message)
-
-    def _check_lp_feasibility(self, D_total: float, Q_total: float, indices_to_remove: list) -> bool:
-        """
-        Check if LP remains feasible after removing facilities.
-
-        Args:
-            D_total (float): Total customer demand.
-            Q_total (float): Total available facility capacity.
-            indices_to_remove (list[int]): List of facilities to remove.
-
-        Returns:
-            bool: True if enough capacity remains, False otherwise.
-        """
-        return (Q_total - sum(self.instance.data["params"]["Q_i"][i] for i in indices_to_remove)) > D_total
+        print(message)
     
-    
-    def _split_indices(self, indices: list) -> list[list[int]]:
+    def _check_lp_feasibility(self, D_total, Q_total, indices_to_remove):
         """
-        Split facility indices into 10 subsets ensuring enough capacity remains.
+        Check if removing a subset of facilities is feasible in terms of remaining capacity.
+    
+        Parameters
+        ----------
+        D_total : float
+            Total demand.
+        Q_total : float
+            Total capacity.
+        indices_to_remove : list
+            Indices of facilities to remove.
+    
+        Returns
+        -------
+        bool
+            True if feasible, False otherwise.
+        """
+        return Q_total - sum(self.instance.data["params"]["Q_i"][i] for i in indices_to_remove) > D_total
+    
+    def _split_indices(self, indices, N=10, epsilon=0.05):
+        """
+        Create N overlapping subsets from a given list of facility indices.
 
-        Args:
-            indices (list[int]): List of facility indices to split.
+        Parameters
+        ----------
+        indices : list[int]
+            List of facility indices open in the LP solution (used as base set).
+        N : int, optional
+            Number of subsets to create (default is 10).
+        epsilon : float, optional
+            Tolerance parameter for oversizing when capacity feasibility is close (default is 0.05).
 
-        Returns:
-            list[list[int]]: List of subsets.
+        Returns
+        -------
+        list[list[int]]
+            A list of N subsets (each a list of facility indices) where elements are sampled with
+            controlled overlap, used for generating restricted LPs in kernel search.
         """
         np.random.seed(12051991)
+        
         indices = np.array(indices)
-        n = len(indices)
-        D_total = sum(self.instance.data["params"]["D_j"])
-        Q_total = sum(self.instance.data["params"]["Q_i"])
+        num_indices= len(indices)
+        
+        # Calculate subset size per split (alpha)
+        alpha = int(np.ceil(num_indices/ min(int(np.ceil(self.rho)),N)))
 
-        divisor = min(int(np.ceil(2 * (Q_total / D_total))), 10)
-        subset_size = int(np.ceil(n / divisor))
+        # Fallback if alpha is too large to ensure feasible removal/replacement
+        if alpha > (len(self.I)-len(indices)): 
+            indices_out = [i for i in range(len(self.I)) if i not in indices]
+            capa_out = sum(self.instance.data["params"]["Q_i"][i] for i in indices_out)
+            capa_in =  sum(self.instance.data["params"]["Q_i"][i] for i in indices)   
+            alpha = int((capa_out/capa_in)*len(indices)*(1-epsilon ))
+        
+        total_slots = N * alpha # total index slots to fill across all subsets
 
-        done = False
-        while not done:
-            total_slots = 10 * subset_size
-            base_count = total_slots // n
-            extra = total_slots - base_count * n
-
-            targets = {idx: base_count for idx in indices}
-            if extra > 0:
-                for idx in np.random.choice(indices, extra, replace=False):
-                    targets[idx] += 1
-
-            subsets = [set() for _ in range(10)]
-            slots_left = [subset_size] * 10
-
-            for idx in np.random.permutation(indices):
-                needed = targets[idx]
-                available = [j for j, slot in enumerate(slots_left) if slot > 0]
-                np.random.shuffle(available)
-                for j in available[:needed]:
-                    subsets[j].add(idx)
+    
+        # Assign base number of appearances to each index
+        base_app = total_slots // num_indices
+        extra = total_slots - base_app * num_indices
+    
+        targets = {idx: base_app for idx in indices}
+        if extra:
+            # Randomly choose indices to get one extra appearance
+            extra_idxs = np.random.choice(indices, extra, replace=False)
+            for idx in extra_idxs:
+                targets[idx] += 1
+    
+        # Initialize empty subsets and track remaining slots
+        subsets = [set() for _ in range(N)]
+        slots_left = [alpha] * N
+    
+         # First pass: assign each index to as many subsets as needed
+        for idx in np.random.permutation(indices):
+            needed = targets[idx]
+            available = [j for j in range(N) if slots_left[j] > 0]
+            np.random.shuffle(available)
+            for j in available[:needed]:
+                subsets[j].add(idx)
+                slots_left[j] -= 1
+    
+        # Fill any remaining slots randomly while avoiding duplicates
+        for j in range(N):
+            while slots_left[j] > 0:
+                candidate = np.random.choice(indices)
+                if candidate not in subsets[j]:
+                    subsets[j].add(candidate)
                     slots_left[j] -= 1
-
-            subsets = [list(subset) for subset in subsets]
-            valid_subsets = [
-                sub for sub in subsets
-                if sum(self.instance.data["params"]["Q_i"][i]
-                       for i in range(self.instance.data["params"]["I"])
-                       if i not in sub) >= D_total
-            ]
-
-            if len(valid_subsets) >= 10:
-                done = True
-            else:
-                subset_size = int(subset_size * 0.9)
-
-        return valid_subsets
+            
+        return [list(s) for s in subsets]
