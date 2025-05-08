@@ -84,9 +84,9 @@ See `scripts/README.md` and `data/README.md` for details.
 
 ## Results and Output
 
-Output files are saved to the `results/` folder and include:
+Output files are saved to the `results/` folder. This folder includes:
 
-* `.json` summaries of individual runs
+* An exemplary `.json` summary of the individual run of PaKS on instance `i300_1`
 * A summary Excel file (`PaKS_CompleteResults.xlsx`) consolidating main results reported in the manuscript
 
 See `results/README.md` for more information.
