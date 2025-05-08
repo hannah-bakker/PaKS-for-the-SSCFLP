@@ -5,7 +5,7 @@
 This folder contains all core Python modules used to model and solve the **Single-Source Capacitated Facility Location Problem (SSCFLP)** using both:
 
 - The proposed **Pattern-based Kernel Search (PaKS)**;
-- The conventional Kernel Search heuristic `KS14` presented in Guastaroba, G., & Speranza, M. G. (2014). [A heuristic for BILP problems: The Single Source Capacitated Facility Location Problem](hhttps://doi.org/10.1016/j.ejor.2014.04.007). *European Journal of Operational Research, 238(2), 438-450.* 
+- The conventional **Kernel Search heuristic KS14** presented in *Guastaroba, G., & Speranza, M. G. (2014). [A heuristic for BILP problems: The Single Source Capacitated Facility Location Problem](hhttps://doi.org/10.1016/j.ejor.2014.04.007). European Journal of Operational Research, 238(2), 438-450.* 
 
 Both algorithms share a common structure, with configurable behavior controlled via parameter dictionaries.
 
