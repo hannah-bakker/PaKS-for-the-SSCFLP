@@ -41,7 +41,7 @@ pip install -r requirements.txt
 
 ## Running an Instance
 
-To execute a single SSCFLP instance using either the original Kernel Search (KS14) or the Pattern-based Kernel Search (PaKS), use the script `scripts/main.py`.
+To execute a single SSCFLP instance using either the conventional Kernel Search (KS14) or the Pattern-based Kernel Search (PaKS), use the script `scripts/main.py`.
 
 This script loads a `.json` instance file, applies the selected configuration, and writes the results to the `results/` folder.
 
