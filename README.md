@@ -19,9 +19,9 @@ PaKS-for-the-SSCFLP/
 ├── data/             # Benchmark instances (in unified JSON format)
 ├── results/          # Output files from algorithm runs
 ├── scripts/          # Executable scripts (run experiments, load instances)
-├── src/              # Source code modules (metaheuristics, models, utils)
-├── requirements.txt  # Python dependencies (to be added)
-├── LICENSE           # License file (recommended)
+├── src/              # Source code modules (kernel_search, models, utils)
+├── requirements.txt  # Python dependencies 
+├── LICENSE           # License file 
 └── README.md         # This file
 ```
 
