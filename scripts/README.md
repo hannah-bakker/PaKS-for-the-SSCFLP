@@ -45,10 +45,10 @@ python load_instance.py <folder_path> <name> <test_set> [<capacity>]
 ```
 
 #### Arguments:
-- <folder_path> — Path to the folder containing the original instance file
-- <name> — Base name of the instance file (without extension)
-- <test_set> — Either "OR4" or a tag such as "B1" / "TB" / "TB-C"
-- [<capacity>] — Optional: overrides the facility capacity for OR4 instances
+- `folder_path` — Path to the folder containing the original instance file
+- `name` — Base name of the instance file (without extension)
+- `test_set` — Either "OR4" or a tag such as "B1" / "TB" / "TB-C"
+- `capacity`— Optional: overrides the facility capacity for OR4 instances
 
 #### Example:
 ```bash
