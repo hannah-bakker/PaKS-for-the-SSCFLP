@@ -6,10 +6,10 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
 import json
-from src.models.instance import Instance
-from src.models.ss_cflp import SS_CFLP
-from src.kernel_search.kernel_search import KernelSearch   
-from src.kernel_search.configurations import KS2014, PaKS 
+from models.instance import Instance
+from models.ss_cflp import SS_CFLP
+from kernel_search.kernel_search import KernelSearch   
+from kernel_search.configurations import KS14, PaKS 
 import warnings
 
 
@@ -26,8 +26,8 @@ def run_instance(path_to_instance, config, timelimit):
                 "I": inst.data["params"]["I"],
                 "J": inst.data["params"]["J"]
                 }
-        if config == "KS2014":
-            this_config = KS2014
+        if config == "KS14":
+            this_config = KS14
         elif config == "PaKS":
             this_config = PaKS
         this_config["total_timelimit"] = timelimit
@@ -35,8 +35,8 @@ def run_instance(path_to_instance, config, timelimit):
         KS = KernelSearch(instance = inst, problem = SS_CFLP, configuration = this_config)
         KS.run_kernel_search(verbose = True)
         KS.get_timings()
-        KS.get_KPIs()
-        with open(f"results/{str(timelimit)}s-PaKS-{name}.json", "w") as json_file:
+        data.update(KS.get_KPIs())
+        with open(f"../results/{str(timelimit)}s-{config}-{name}.json", "w") as json_file:
             json.dump(data, json_file, indent=4)
        
 
