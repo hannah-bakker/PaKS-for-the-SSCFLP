@@ -1,4 +1,4 @@
-# Enhancing Kernel Search with Pattern Recognition for the Single-Source Capacitated Facility Location Problem
+# Enhancing Kernel Search with Pattern Recognition: the Single-Source Capacitated Facility Location Problem
 
 This repository provides the implementation of **Pattern-based Kernel Search (PaKS)**, a two-phase metaheuristic for solving the **Single-Source Capacitated Facility Location Problem (SSCFLP)**. The algorithm integrates **pattern recognition techniques** into a traditional kernel search framework to improve solution quality and scalability.
 
