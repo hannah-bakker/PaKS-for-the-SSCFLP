@@ -3,16 +3,15 @@
 solution.py
 
 Defines the Solution class for storing, loading, and visualizing solutions 
-to facility location problems.
-
+to the SSCFLP.
 """
 
 import json
-from ..utils.plot import SSCFLPPlot  
+from utils.plot import SSCFLPPlot  
 
 class Solution:
     """
-    Class representing a solution for a facility location problem instance.
+    Class representing a solution to the SSCFLP.
     """
 
     def __init__(self, 

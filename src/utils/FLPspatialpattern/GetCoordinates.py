@@ -1,5 +1,8 @@
 # -*- coding: utf-8 -*-
 """
+GetCoordinates.py
+see https://doi.org/10.5281/zenodo.12771297 for further details.
+
 @author: hannah.bakker@kit.edu / stefan.nickel@kit.edu
 @date: 16.07.2024
 """

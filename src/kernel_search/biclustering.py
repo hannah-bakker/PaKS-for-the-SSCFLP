@@ -3,11 +3,7 @@
 biclustering.py
 
 Defines functions and a class for performing biclustering based on feature matrices 
-derived from facility location solutions.
-
-Supports various aggregation schemes, removal of sparse regions, 
-and computation of intra- and inter-region overlap metrics.
-
+derived from a set of solutions to the SSCFLP.
 """
 
 import numpy as np
@@ -18,84 +14,80 @@ from sklearn.exceptions import ConvergenceWarning
 
 def alpha(S: dict) -> pd.DataFrame:
     """
-    Aggregate a set of solution vectors into a binary feature matrix.
-
-    This function computes an I x J matrix where each entry (i, j) counts how often
-    assignment variable x_ij is active (rounded up to 1) across all solutions in S.
+    Aggregate assignment decisions across a set of solutions into an I×J count matrix.
 
     Parameters
     ----------
     S : dict
-        Dictionary of Solution objects, where each Solution includes 'dvars' with keys 'x' and 'y'.
+        Dictionary of Solution objects. Each must contain 'dvars' with 'x' decisions.
 
     Returns
     -------
     pd.DataFrame
-        I x J binary feature matrix representing the union of assignment decisions.
+        I x J count matrix with the total number of assignments (after rounding) across solutions.
     """
-
+    # Infer problem size from first solution
     I = len(S[0].data["dvars"]["y"])
     J = int(len(S[0].data["dvars"]["x"]) / I)
     A = np.zeros((I, J))
 
-    for s, sol in S.items():
-        rows, cols = zip(*sol.data["dvars"]["x"].keys())
-        values = list(sol.data["dvars"]["x"].values())
+    for sol in S.values():
+        x_vals = sol.data["dvars"]["x"]
         x_s = np.zeros((I, J))
-        x_s[rows, cols] = values
-        x_s[rows, cols] = [np.ceil(v) for v in values]
+        for (i, j), v in x_vals.items():
+            x_s[i, j] = np.ceil(v)
         A += x_s
-        
+
     return pd.DataFrame(A)
 
 def remove_zeros(A: pd.DataFrame) -> pd.DataFrame:
     """
-    Remove all-zero rows and columns from a binary or numeric feature matrix.
+    Remove all-zero rows (facilities) from the feature matrix.
 
     Parameters
     ----------
     A : pd.DataFrame
-        Input feature matrix where rows typically represent facilities and
-        columns represent customers or features.
+        I x J feature matrix where each entry (i, j) reflects the number of times
+        facility i was assigned to customer j across solutions.
 
     Returns
     -------
     pd.DataFrame
-        Reduced feature matrix with only non-zero rows and columns.
+        Reduced feature matrix without zero-only rows (facilities) or columns (customers).
     """
-    A_dash = A.loc[:, (A != 0).any(axis=0)]
-    A_dash = A_dash.loc[(A_dash != 0).any(axis=1), :]
-    return A_dash
+    # Remove all-zero rows (facilities)
+    A = A.loc[(A != 0).any(axis=1), :]
+    return A
 
 def l_inter(Rcal: dict, A: pd.DataFrame) -> float:
     """
-    Compute the inter-region overlap metric l_inter.
-
-    This metric quantifies the proportion of nonzero activity in a feature matrix A
-    that lies outside the explicitly excluded columns defined by Rcal.
+    Compute the metric l_inter.
 
     Parameters
     ----------
     Rcal : dict
-        Dictionary mapping region identifiers to tuples of the form (rows, excluded_cols),
-        where:
-            - rows: list of row indices in A belonging to a region.
-            - excluded_cols: list of column indices to be excluded for that region.
-
+        Regions.
     A : pd.DataFrame
-        Binary or numeric feature matrix (e.g., facility-customer interactions).
+        Numeric feature matrix.
 
     Returns
     -------
     float
-        Normalized l_inter value in the range [0, 1], representing the fraction of the
-        total matrix sum that lies *outside* the excluded columns for each region.
+        l_inter value in the range [0, 1], representing the fraction of the
+        out-of-region-allocations.
     """
     total_sum = 0
-    for rows, excluded_cols in Rcal.values():
-        included_cols = [col for col in A.columns if col not in excluded_cols]
-        total_sum += A.iloc[rows][included_cols].values.sum()
-    return total_sum / A.values.sum()
+    for R in Rcal.values():
+        # Extract the row indices and column indices
+        row_indices = R[0]
+        col_indices_to_exclude = R[1]
+
+        # Get the column indices to include by excluding the specified columns
+        col_indices_to_include = [col for col in A.columns if col not in col_indices_to_exclude]
+
+        # Use NumPy to sum the selected elements efficiently
+        total_sum += A.iloc[row_indices][col_indices_to_include].values.sum()
+    return total_sum/A.values.sum()
 
 def bicluster(A: pd.DataFrame, r: int) -> dict:
     """
@@ -104,7 +96,7 @@ def bicluster(A: pd.DataFrame, r: int) -> dict:
     Parameters
     ----------
     A : pd.DataFrame
-        Feature matrix (e.g., facility-customer associations). Should be non-empty and non-trivial.
+        Feature matrix.
     r : int
         Number of biclusters to identify (must be > 0).
 
@@ -113,49 +105,39 @@ def bicluster(A: pd.DataFrame, r: int) -> dict:
     dict
         A dictionary of biclusters in the format:
             {cluster_id: (row_indices, column_indices), ...}
-        Includes an additional entry with key -1 for any rows/columns not assigned to a cluster
-        (though this is unlikely with SpectralCoclustering).
     """
-    I = list(A.index)
-    J = list(A.columns)
+    I = [i for i in A.index] 
+    J = [j for j in A.columns] 
     
     A = remove_zeros(A)
-    model = SpectralCoclustering(n_clusters=r, n_init=10, random_state=12051991)
-    model.fit(A)
 
-    row_labels = {i: model.row_labels_[pos] for pos, i in enumerate(A.index)}
-    col_labels = {j: model.column_labels_[pos] for pos, j in enumerate(A.columns)}
-
-    Rcal = {}
+    biclustering = SpectralCoclustering(n_clusters=r, 
+                                n_init = 10,
+                                random_state=np.random.RandomState(12051991),
+                                )
+    biclustering.fit(A)  
+    row_labels = [-1 for i in I]
+    column_labels = [-1 for j in J]  
+    
+    for position, i in enumerate(A.index):
+        row_labels[i] = biclustering.row_labels_[position]
+        
+    for position, j in enumerate(A.columns):
+        column_labels[j] = biclustering.column_labels_[position]     
+   
+    Rcal = dict()
     for r_label in range(r):
-        Rcal[r_label] = (
-            [i for i in I if row_labels.get(i, -1) == r_label],
-            [j for j in J if col_labels.get(j, -1) == r_label]
-        )
-    Rcal[-1] = (
-        [i for i in I if row_labels.get(i, -1) == -1],
-        [j for j in J if col_labels.get(j, -1) == -1]
-    )
-
+        Rcal[r_label] = ([i for i in I if row_labels[i] == r_label], [j for j in J if column_labels[j] == r_label])
+    Rcal[-1] = ([i for i in I if row_labels[i] == -1], [j for j in J if column_labels[j] == -1])
+    
     return Rcal
 
 class Biclustering:
     """
-    Biclustering framework to derive bicluster-based regions from multiple LP-based solutions.
+    Biclustering framework for identifying coherent regions from LP-relaxation solutions.
 
-    This class computes an aggregated feature matrix from a dictionary of Solution objects,
-    and uses spectral co-clustering to identify overlapping regions of facility-customer interactions.
-
-    Attributes
-    ----------
-    A : pd.DataFrame
-        Aggregated feature matrix of binary assignment variables.
-    Rcal : dict
-        Dictionary of identified bicluster regions (rows, excluded columns).
-    Rcal_set : dict
-        Unused (placeholder for extensions, e.g., tracking iterations).
-    l_inter : float
-        Inter-region overlap score, indicating region separation quality.
+    Uses Spectral Co-clustering to group facilities and customers into assignment regions,
+    stopping when inter-region coherence exceeds a defined threshold (theta).   
     """
 
     def __init__(self, S: dict, theta: float):
@@ -168,22 +150,20 @@ class Biclustering:
             Dictionary of Solution objects (indexed by integer keys).
         theta : float
             Threshold on the inter-region overlap score to stop clustering.
-            Lower theta implies less overlap between identified regions (more separated clusters).
         """
         warnings.filterwarnings('ignore', category=ConvergenceWarning)
 
         self.A = alpha(S)
-        self.Rcal_set = {}
         self.l_inter = 0.0
 
         r = 2
         self.Rcal = bicluster(self.A, r)
         self.l_inter = l_inter(self.Rcal, self.A)
 
+        # Increase the number of clusters until inter-region coherence (l_inter) exceeds threshold
         while self.l_inter < theta:
-            r += 1
-            Rcal_candidate = bicluster(self.A, r)
-            l_inter_candidate = l_inter(Rcal_candidate, self.A)
-            if l_inter_candidate <= theta:
-                self.Rcal = Rcal_candidate
-                self.l_inter = l_inter_candidate
+                r += 1
+                Rcal = bicluster(self.A, r=r)
+                self.l_inter = l_inter(Rcal, self.A)
+                if self.l_inter <= theta:
+                    self.Rcal = Rcal

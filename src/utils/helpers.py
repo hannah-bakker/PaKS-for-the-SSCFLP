@@ -8,14 +8,19 @@ storing/loading solution sets, and computing set overlaps.
 """
 
 import time
-import json
 import ast
 import pandas as pd
-from ..model.solution import Solution  # relative import for consistency
 
 def time_step(func):
     """
-    Decorator to time a method and store its execution time in an instance attribute `method_times`.
+    Decorator to measure and store the execution time of a method.
+
+    The elapsed time is stored in the instance attribute `method_times` under the key "time_<method_name>".
+    If the instance has `verbose=True`, it prints the duration to the console.
+
+    Returns
+    -------
+    The result of the original method call, unaffected by the timing logic.
     """
     def wrapper(*args, **kwargs):
         instance = args[0]
@@ -36,15 +41,21 @@ def time_step(func):
 
 def add_line_to_df(df: pd.DataFrame, line: dict, index: int = None) -> pd.DataFrame:
     """
-    Add a line (row) to a DataFrame.
+    Append or insert a new row to a pandas DataFrame.
 
-    Args:
-        df (pd.DataFrame): Target DataFrame.
-        line (dict): Line to add (column:value pairs).
-        index (int, optional): Row index. Defaults to next available index.
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The target DataFrame to which the row should be added.
+    line : dict
+        Dictionary containing column-value pairs for the new row.
+    index : int, optional
+        Index at which to insert the row. Defaults to the next available integer index.
 
-    Returns:
-        pd.DataFrame: Updated DataFrame.
+    Returns
+    -------
+    pd.DataFrame
+        The updated DataFrame including the new row.
     """
     index = index or (len(df) + 1)
     if df.empty:
@@ -55,25 +66,36 @@ def add_line_to_df(df: pd.DataFrame, line: dict, index: int = None) -> pd.DataFr
 
 def concat_to_string_name(mylist: list) -> str:
     """
-    Concatenate a list of elements into a string separated by underscores.
+    Convert a list of elements into a single underscore-separated string.
 
-    Args:
-        mylist (list): List of elements.
+    Parameters
+    ----------
+    mylist : list
+        List of elements to concatenate. Elements are converted to strings if not already.
 
-    Returns:
-        str: Concatenated string.
+    Returns
+    -------
+    str
+        A single string formed by joining the elements with underscores.
+        Example: [1, "a", 3] -> "1_a_3"
     """
     return "_".join(str(e) for e in mylist)
 
 def convert_keys_to_tuples(data: dict) -> dict:
     """
-    Reconvert string-represented tuple keys (after JSON storage) back to actual tuples.
+    Convert dictionary keys that are string representations of tuples 
+    back into actual tuple keys. This is useful after loading JSON files
+    where tuple keys were stringified.
 
-    Args:
-        data (dict): Dictionary with string keys.
+    Parameters
+    ----------
+    data : dict
+        Dictionary with keys as strings that may represent tuples (e.g., "(1, 2)").
 
-    Returns:
-        dict: Dictionary with tuple keys.
+    Returns
+    -------
+    dict
+        Dictionary with tuple keys where applicable.
     """
     new_data = {}
     for key, value in data.items():
@@ -90,81 +112,3 @@ def convert_keys_to_tuples(data: dict) -> dict:
             new_data[key] = value
     return new_data
 
-def store_S(S: dict, path: str) -> None:
-    """
-    Store a dictionary of Solutions as a JSON file.
-
-    Args:
-        S (dict): Dictionary of Solution objects.
-        path (str): File path (without extension).
-    """
-    for s in S.values():
-        s.data["dvars"]["x"] = {str(key): value for key, value in s.data["dvars"]["x"].items()}
-        if "reduced_costs" in s.data:
-            s.data["reduced_costs"]["x"] = {str(key): value for key, value in s.data["reduced_costs"]["x"].items()}
-
-    store_dict = {s: S[s].data for s in S.keys()}
-    with open(path + ".json", "w") as json_file:
-        json.dump(store_dict, json_file, indent=1)
-
-    for s in S.values():
-        s.data["dvars"]["x"] = {eval(key): value for key, value in s.data["dvars"]["x"].items()}
-        if "reduced_costs" in s.data:
-            s.data["reduced_costs"]["x"] = {eval(key): value for key, value in s.data["reduced_costs"]["x"].items()}
-
-def load_S(path: str, instance) -> dict:
-    """
-    Load a dictionary of Solutions from a JSON file.
-
-    Args:
-        path (str): File path.
-        instance (Instance): Associated instance.
-
-    Returns:
-        dict: Dictionary of Solution objects.
-    """
-    with open(path) as json_file:
-        data = json.load(json_file)
-
-    S = {
-        int(s): Solution(instance=instance, from_dict=solution_vals)
-        for s, solution_vals in data.items()
-    }
-
-    for solution in S.values():
-        for decision_variable in solution.data["dvars"]:
-            solution.data["dvars"][decision_variable] = convert_keys_to_tuples(solution.data["dvars"][decision_variable])
-
-    return S
-
-def overlap(A: list, B: list) -> float:
-    """
-    Calculate normalized overlap between two lists: (|A ∩ B| / min(|A|, |B|)).
-
-    Args:
-        A (list): List of indices.
-        B (list): List of indices.
-
-    Returns:
-        float: Overlap coefficient in [0, 1].
-    """
-    A, B = set(A), set(B)
-    intersection = A.intersection(B)
-    min_card = min(len(A), len(B))
-    return round(len(intersection) / min_card, 2) if min_card > 0 else 0
-
-def Jacc(A: list, B: list) -> float:
-    """
-    Calculate Jaccard similarity between two lists: (|A ∩ B| / |A ∪ B|).
-
-    Args:
-        A (list): List of indices.
-        B (list): List of indices.
-
-    Returns:
-        float: Jaccard index in [0, 1].
-    """
-    A, B = set(A), set(B)
-    intersection = A.intersection(B)
-    union = A.union(B)
-    return round(len(intersection) / len(union), 2) if len(union) > 0 else 0

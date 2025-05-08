@@ -1,24 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-SSCFLPPlot
+plot.py
 
 Visualization module for SSCFLP instances, solutions, regions, and kernel search components.
 
-Author: Hannah Bakker (hannah.bakker@kit.edu)
 """
-
-# =============================================================================
-# Imports
-# =============================================================================
 import time
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
-from ..utils.FLPspatialpattern.GetCoordinates import GetCoordinates
+from utils.FLPspatialpattern.GetCoordinates import GetCoordinates
 
-# =============================================================================
-# SSCFLPPlot Class
-# =============================================================================
 class SSCFLPPlot:
     """
     Class for visualizing capacitated facility location problems (SSCFLP) instances, 
@@ -46,12 +38,17 @@ class SSCFLPPlot:
 
     def __init__(self, size: float, **params):
         """
-        Initialize a plot object.
+        Initialize a plotting object for SSCFLP visualizations.
 
-        Args:
-            size (float): Fraction of textwidth for sizing the figure.
-            **params: Optional plotting parameters.
+        Parameters
+        ----------
+        size : float
+            Fraction of LaTeX text width used to scale the figure size. For example,
+            0.5 will create a figure that is half the LaTeX text width.
+        **params : dict, optional
+            Additional plotting parameters to store for custom use (e.g., colors, markers).
         """
+
         self.size = size
         self.params = params
         self.lgd = None
@@ -64,13 +61,36 @@ class SSCFLPPlot:
         plt.rcParams['savefig.dpi'] = 1000
 
     def _set_size(self, fraction: float):
-        """Helper to calculate figure size."""
+        """
+        Compute figure dimensions in inches from a fraction of LaTeX text width.
+
+        Parameters
+        ----------
+        fraction : float
+            Fraction of the text width to scale the figure to (e.g., 0.5 means half the width).
+
+        Returns
+        -------
+        tuple
+            A tuple (width, height) in inches, assuming a square figure.
+        """
         inches_per_pt = 1 / 72.27
         fig_width_in = self.MYTEXTWIDTH * fraction * inches_per_pt
         return fig_width_in, fig_width_in
 
     def _save(self, path: str, close: bool = True, png: bool = False):
-        """Save the figure to file."""
+        """
+        Save the plot to a file in PNG or PDF format.
+
+        Parameters
+        ----------
+        path : str
+            File path (without extension) where the figure should be saved.
+        close : bool, optional
+            If True, closes the figure after saving to free memory. Default is True.
+        png : bool, optional
+            If True, saves the figure as a PNG file. Otherwise saves as PDF.
+        """
         plt.rcParams.update({'figure.subplot.left': 0, 'figure.subplot.bottom': 0,
                              'figure.subplot.right': 1, 'figure.subplot.top': 1})
         if not self.lgd:
@@ -99,13 +119,21 @@ class SSCFLPPlot:
 
     def _add_subplot(self, instance, solution=None, regions=None, **kwargs):
         """
-        Add a subplot showing the instance, solution, regions, etc.
+        Add a subplot displaying the instance layout and optionally the solution or regions.
 
-        Args:
-            instance: Instance object.
-            solution: Solution object (optional).
-            regions: Region dict (optional).
-            kwargs: Other plotting options.
+        Parameters
+        ----------
+        instance : Instance
+            The instance object containing facility and customer data.
+        solution : Solution, optional
+            A solution object with open facilities and assignments.
+        regions : dict, optional
+            Optional region coloring/grouping to be shown.
+        **kwargs :
+            Additional plotting arguments, e.g.:
+            - legend (bool): Whether to include a legend (default: True)
+            - title (str): Title of the subplot
+            - no_customers (bool): If True, suppress customer plot
         """
         self.params.update(kwargs)
         self.ax = self.fig.add_subplot(111)
@@ -147,7 +175,17 @@ class SSCFLPPlot:
         return self.ax
 
     def _compute_marker_sizes(self, instance):
-        """Compute marker sizes for plotting facilities and customers."""
+        """
+        Compute relative marker sizes for plotting facilities and customers.
+
+        Marker sizes are scaled proportionally to each facility's capacity (Q_i)
+        and each customer's demand (D_j), using a figure-width-based scaling.
+
+        Parameters
+        ----------
+        instance : Instance
+            The instance object containing parameters 'Q_i' (capacities) and 'D_j' (demands).
+        """
         width_per_marker_pt = self.MYTEXTWIDTH / (instance.data["params"]["I"] + instance.data["params"]["J"])
         total_I_pt = (width_per_marker_pt * instance.data["params"]["I"])**2 * 1.5
         self.size_I = [total_I_pt * q / sum(instance.data["params"]["Q_i"]) for q in instance.data["params"]["Q_i"]]

@@ -4,19 +4,18 @@ ss_cflp.py
 
 Defines the SS_CFLP class, which models the single-source capacitated facility location problem
 (SSCFLP) as a mixed-integer program using docplex. It extends the base MIP class with problem-specific
-constraints, and methods used throughout PaKS and KS2014 to identify solutions to LP relaxations and add or 
+constraints, and methods used throughout PaKS and KS14 to identify solutions to LP relaxations and add or 
 remove constraints in restricted BIPs.
 """
 
 import numpy as np
 from docplex.mp.relax_linear import LinearRelaxer as LR
-from ..model.general_mip import MIP
-from ..model.solution import Solution
+from models.general_mip import MIP
+from models.solution import Solution
 
 class SS_CFLP(MIP):
     """
     SSCFLP model class extending the base MIP. 
-    
     """
 
     NAME = "SS_CFLP"
@@ -126,7 +125,7 @@ class SS_CFLP(MIP):
             ctname=f"upper_bound_iteration_{iteration}"
         )
         
-    def _enforce_using_the_bucket_variables(self, B_y: list[int], iteration: int = None) -> None:
+    def _enforce_using_the_bucket_variables(self, B_y: list, iteration: int = None) -> None:
         """
         Enforce that at least one facility in the current bucket is opened.
 
@@ -137,7 +136,7 @@ class SS_CFLP(MIP):
         Parameters
         ----------
         B_y : list[int]
-            Indices of facilities (i ∈ I) in the current bucket.
+            Indices of facilities in the current bucket.
         iteration : int, optional
             Iteration index used for naming the constraint uniquely.      
         """
@@ -235,7 +234,7 @@ class SS_CFLP(MIP):
     
     def _get_LP_solution(self, timelimit: int = 3600) -> Solution:
         """
-        Solve the linear relaxation of the SSCFLP as required in KS2014.
+        Solve the linear relaxation of the SSCFLP as required in KS14.
 
         Parameters
         ----------
@@ -309,7 +308,6 @@ class SS_CFLP(MIP):
         # Return the LP solution object
         return Solution(
             instance=self.instance,
-            problem_type=self.NAME,
             name=str(self.m_LR.name),
             obj=self.m_LR.solution.get_objective_value(),
             time=self.m_LR.solve_details.time,
@@ -324,13 +322,16 @@ class SS_CFLP(MIP):
         """
         Generate LP relaxations by selectively removing facilities and solving smaller subproblems.
 
-        Args:
+        Parameters
+        ----------
             timelimit (int): Total allowed solving time (seconds).
             VIs (str): Type of valid inequalities. Options: "all" or "lazy".
             iterations_VIs (int): Number of VI addition iterations (only used if VIs="lazy").
 
-        Returns:
-            dict: Dictionary containing multiple Solution objects.
+        Returns
+        -------
+        S : dict
+            Dictionary containing multiple Solution objects.
         """        
         S = {}
 
@@ -409,7 +410,6 @@ class SS_CFLP(MIP):
         # Save s1.                   
         S[0] = Solution(
                 instance = self.instance,
-                problem_type = self.problem_type,
                 name=str(self.m_LR.name),
                 obj=self.m_LR.solution.get_objective_value(),
                 time=self.m_LR.solve_details.time,
@@ -448,7 +448,6 @@ class SS_CFLP(MIP):
                                       
                 S[len(S)] = Solution(
                      instance = self.instance,
-                     problem_type = self.problem_type,
                      name=str(self.m_LR.name),
                      obj=self.m_LR.solution.get_objective_value(),
                      time=self.m_LR.solve_details.time,

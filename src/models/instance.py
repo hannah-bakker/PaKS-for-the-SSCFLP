@@ -3,12 +3,12 @@
 instance.py
 
 This module defines the Instance class for loading, visualizing, and storing
-benchmark instances for facility location problems.
+benchmark instances for the SSCFLP.
 
 """
 
 import json
-from ..utils.plot import SSCFLPPlot  
+from utils.plot import SSCFLPPlot  
 
 class Instance:
     """
@@ -35,9 +35,6 @@ class Instance:
                   png: bool = False, legend: bool = True, no_customers: bool = False):
         """
         Visualize the SSCFLP instance with optional facility and customer selection.
-
-        Uses the SSCFLPPlot utility to create a visual representation of the instance.
-        Allows selective plotting and configurable output.
 
         Parameters
         ----------

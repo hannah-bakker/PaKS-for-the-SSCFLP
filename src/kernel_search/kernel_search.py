@@ -3,7 +3,7 @@
 kernel_search.py 
 
 Kernel Search Algorithm Implementation, 
-both PaKS and KS2014 depending on the configuration
+both PaKS and KS14 depending on the configuration
 
 """
 
@@ -12,8 +12,8 @@ import itertools
 import json
 import numpy as np
 
-from ..kernel_search.biclustering import Biclustering as BC
-from ..utils.helpers import time_step
+from kernel_search.biclustering import Biclustering as BC
+from utils.helpers import time_step
 
 class KernelSearch():
     """
@@ -119,7 +119,7 @@ class KernelSearch():
                    ):
         """
         Phase 1 & KS Initialization in case of PaKS; 
-        Solving the LP relaxation & KS Initialization in case of KS2014.
+        Solving the LP relaxation & KS Initialization in case of KS14.
         """
         self.generate_S()
              
@@ -145,13 +145,13 @@ class KernelSearch():
         """
         Generate the initial set of solutions S. 
         For PaKS a set S; 
-        for KS2014 a S contains only the solution to LP(Y U X). 
+        for KS14 a S contains only the solution to LP(Y U X). 
         """
         self.log("\nInitializing model object.")
         self.model = self.problem(self.instance)  # Generate model object
         
         # Generate initial solutions based on the configuration
-        if self.configuration["name"] == "KS2014":
+        if self.configuration["name"] == "KS14":
              self._get_LP_solution()
         elif self.configuration["name"] == "PaKS":
              self._get_solution_set()
@@ -167,7 +167,7 @@ class KernelSearch():
  
     def _get_LP_solution(self):
         """
-        Get LP(Y U X) solution s1 for KS2014.
+        Get LP(Y U X) solution s1 for KS14.
         """
         self.S = {
             0: self.model._get_LP_solution(
@@ -181,7 +181,7 @@ class KernelSearch():
         problem size.
         """
         self.S = self.model._get_S(
-            timelimit= self.configuration["total_timelimit"]
+            timelimit= self.configuration["total_timelimit"],
             num_VI = self.configuration["num_VI"], 
             N = self.configuration["N"], 
             epsilon = self.configuration["epsilon"], 
@@ -196,7 +196,6 @@ class KernelSearch():
         
         biclustering = BC(
             S=self.S,
-            instance=self.instance,
             theta =  self.configuration["theta"], 
         )
         
@@ -242,7 +241,7 @@ class KernelSearch():
         sorted_I_open = dict(sorted(I_open.items(), key=lambda item: item[1], reverse=True))
 
         # Add Closed Facilities Sorted by Reduced Costs 
-        if self.configuration["name"] == "KS2014": # for PaKS facilities that do not operate in and solution in S are no longer considered
+        if self.configuration["name"] == "KS14": # for PaKS facilities that do not operate in and solution in S are no longer considered
             reduced_costs_y = np.array([
                 [self.S[s].data["reduced_costs"]["y"][i] for i in I_keys] for s in S_keys
             ])
@@ -257,30 +256,28 @@ class KernelSearch():
 
         # Identify x-Variables with Low Reduced Costs
         IJ_keys = itertools.product(range(self.instance.data["params"]["I"]), range(self.instance.data["params"]["J"]))
-        threshold = np.percentile(list(self.S[0].data["reduced_costs"]["x"].values()), 50)
+        gamma_head = np.percentile(list(self.S[0].data["reduced_costs"]["x"].values()), 50)
         self.sorted_red_costs = [
             ij for ij in IJ_keys
-            if self.S[0].data["reduced_costs"]["x"][ij] < threshold
+            if self.S[0].data["reduced_costs"]["x"][ij] < gamma_head
         ]
         self.sorted_red_costs = set(self.sorted_red_costs)
         
         
         # Identify x-Variables with Low Transportation Costs (PaKS only)
         if self.configuration["name"] == "PaKS":
-            threshold = np.percentile(np.array(self.instance.data["params"]["c_ij"]), 50, axis=0)
+            gamma_j = np.percentile(np.array(self.instance.data["params"]["c_ij"]), 50, axis=0)
             self.sorted_transport =  [
                         (facility_idx, customer_idx)
                         for facility_idx in range(self.instance.data["params"]["I"])
                         for customer_idx in range(self.instance.data["params"]["J"])
-                        if self.instance.data["params"]["c_ij"][facility_idx][customer_idx] <  threshold[customer_idx]
+                        if self.instance.data["params"]["c_ij"][facility_idx][customer_idx] <  gamma_j[customer_idx]
                     ]
             self.sorted_transport = set(self.sorted_transport)
         
         
         self.log("Variable sorting completed.")
-        self.log(f"Number of facilities that are sorted {len(self.sorted_I)}.")
         I_keys = list(self.sorted_I.keys())
-        self.log(f"{len(I_keys)} list; {len(set(I_keys))} set.")
     
     def _get_x_variables_associated_with_y_variables(self, Y):
         """
@@ -288,7 +285,7 @@ class KernelSearch():
 
         Depending on the configuration, this method selects x_ij variables using:
         - Region-based selection and transportation cost thresholds (PaKS)
-        - Reduced-cost filtering (KS2014)
+        - Reduced-cost filtering (KS14)
 
         Parameters
         ----------
@@ -319,7 +316,7 @@ class KernelSearch():
                                and ij in self.sorted_transport
                                 ])
           
-        elif self.configuration["name"] == "KS2014":
+        elif self.configuration["name"] == "KS14":
             # Select all x_ij with reduced cost below threshold, where i is in the current Y  
             K_x = [ij for ij in self.sorted_red_costs if ij[0] in Y]
         
@@ -338,7 +335,7 @@ class KernelSearch():
         sorted_I = self.sorted_I.keys()
         
         # Get K_y based on configuration
-        if self.configuration["name"] == "KS2014":
+        if self.configuration["name"] == "KS14":
             # Add all facilities that had y_i > 0 in s1 (stored in S[0])
             self.K["y"] = [i for i in sorted_I if self.S[0].data["dvars"]["y"][i]>0]
                  
@@ -355,9 +352,6 @@ class KernelSearch():
         
         # Track kernel size
         self.len_initial_K_y = len(self.K["y"])
-        
-        self.log(f"Number of facilities in initial kernel {len(self.K['y'])}.")
-        self.log(f"{len(self.K['y'])} list; {len(self.K['y'])} set.")
        
         # Track facilities not in kernel (to build buckets later)
         self.unassigned_Y_i = [i for i in sorted_I if i not in self.K["y"]]
@@ -377,7 +371,7 @@ class KernelSearch():
         self.log("\nDeriving buckets.")
 
         # Determine B_r_y      
-        if self.configuration["name"] == "KS2014":
+        if self.configuration["name"] == "KS14":
             self.length_bucket_y = self.len_initial_K_y 
             bucket_indices_y = [
                                     self.unassigned_Y_i[i:i + self.length_bucket_y]
@@ -401,8 +395,8 @@ class KernelSearch():
         # Store bucket structures
         self.B = {h: {"y": bucket_indices_y[h], "x": bucket_indices_x[h]} for h in range(len(bucket_indices_y))}
     
-        # Validation for KS2014: all y-variables should be covered
-        if self.configuration["name"] == "KS2014":
+        # Validation for KS14: all y-variables should be covered
+        if self.configuration["name"] == "KS14":
             assert len(self.K["y"]) + sum([len(B["y"]) for B in self.B.values()])==self.instance.data["params"]["I"], "Not all variables have been assigned to a bucket."
         # Determine the number of buckets
         self.num_Br = len(self.B)
@@ -426,7 +420,7 @@ class KernelSearch():
         # Update the time limit for the restricted MIP
         self.update_time_for_restricted_MIPs(
             self.configuration["total_timelimit"] - (time.time() - self.start_time_KS),
-            1 + min(self.configuration["NB_bar"], self.num_Br),
+            1 + self.num_Br,
         )        
        
         # Restrict to current kernel   
@@ -438,9 +432,7 @@ class KernelSearch():
                                                    )
         
         # Solve the MIP
-        self.sol_initial_kernel = self.model._solve(timelimit = self.time_limit_restricted_MIP, 
-                                                    conditional_timelimit = self.configuration["total_timelimit"] - (time.time() - self.start_time_KS)
-                                                    )
+        self.sol_initial_kernel = self.model._solve(timelimit = self.time_limit_restricted_MIP)
         # Check feasibility
         if self.sol_initial_kernel.data["obj"]  == "infeasible":
             self.log("No feasible solution found for intial kernel.")
@@ -448,10 +440,9 @@ class KernelSearch():
         else:   
             
             # Store information on initial kernel solution. 
-            self.MIPs_solved +=1
             self.z_H = self.sol_initial_kernel.data["obj"]
             self.sol_KS = self.sol_initial_kernel 
-            self.I_KS = [i for i in self.I_K]
+            self.I_KS = [i for i, val in self.sol_initial_kernel.data["dvars"]["y"].items() if val >0]
             
             self.log(f"Solved MIP(K) - z_H={self.z_H}.")
         
@@ -471,7 +462,7 @@ class KernelSearch():
         # Initialize unused kernel counter
         K_unused = {i: 0 for i in self.K["y"]}
         iteration = 0
-        max_iterations = min(self.configuration["NB_bar"], self.num_Br)
+        max_iterations = self.num_Br
 
         while iteration < max_iterations:
             self.log(f"\nIteration {iteration + 1}.")
@@ -500,17 +491,12 @@ class KernelSearch():
                        
             # Get time remaining for restricted MIP
             self.update_time_for_restricted_MIPs(self.configuration["total_timelimit"]-(time.time()-self.start_time_KS), 
-                                                 min(self.configuration["NB_bar"], self.num_Br)-iteration)
+                                                  self.num_Br-iteration)
 
             self.log(f"\nSolve in {self.time_limit_restricted_MIP}s.")
 
             # Solve restricted MIP (KUB)
-            if self.z_H == float('inf'): # if no feasible solution was found yet, then try to find incumbent solution
-                 current_sol = self.model._solve(timelimit = self.time_limit_restricted_MIP,
-                                                 conditional_timelimit = self.configuration["total_timelimit"] - (time.time() - self.start_time_KS)
-                                                 )
-            else:
-                 current_sol = self.model._solve(timelimit = self.time_limit_restricted_MIP)
+            current_sol = self.model._solve(timelimit = self.time_limit_restricted_MIP)
 
             self.solved_previous_MIP_to_optimality = bool(current_sol.data["optimal"])
 
@@ -657,13 +643,11 @@ class KernelSearch():
                 "z_KS" :                        self.z_H, #objective value 
                 "len(I_KS)":                    len(self.I_KS),             # number of facilities operating in KS final solution
                 "m":                            self.len_initial_K_y,       # variables in initial kernel 
-                "len(I_K)":                     len(self.I_K),              # number of facilities operating in initial kernel solution
                 "num_Br":                           self.num_Br,                    # parameter NB - how many restricted MIPs were to be solved                
                 "bucket_size_y":                0,
                 "bucket_size_x":                0,
                 "bucket_size_y_avg":            0,
                 "bucket_size_x_avg":            0,        
-                "r":                            self.model.r,        
                 }
 
         # Retrieve number of variables (x and y) in kernel and buckets.       

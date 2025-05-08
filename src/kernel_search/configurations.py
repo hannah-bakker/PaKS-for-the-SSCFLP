@@ -24,8 +24,8 @@ PaKS = {
 # Kernel Search - KS-2014 Configuration (Guastaroba et al. 2014)
 # =============================================================================
 
-KS_2014 = {
-    "name": "KS-2014",
+KS14 = {
+    "name": "KS14 = {",
     
     "epsilon": 1e-8,          # feasibility tolerance
 
