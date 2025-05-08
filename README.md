@@ -2,7 +2,7 @@
 
 This repository provides the implementation of **Pattern-based Kernel Search (PaKS)**, a two-phase matheuristic for solving the **Single-Source Capacitated Facility Location Problem (SSCFLP)**. The algorithm integrates **pattern recognition techniques** into a traditional kernel search framework to improve solution quality and scalability.
 
-The repository also includes a re-implementation of the **original Kernel Search (KS14)** heuristic (2014) for benchmarking and comparison purposes.
+The repository also includes a re-implementation of the Kernel Search presented in *Guastaroba, G., & Speranza, M. G. (2014). A heuristic for BILP problems: The Single Source Capacitated Facility Location Problem. European Journal of Operational Research, 238(2), 438-450.* for benchmarking and comparison purposes.
 
 This code accompanies the manuscript:
 
