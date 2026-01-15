@@ -15,7 +15,7 @@ Implements the main logic for **PaKS** metaheuristics.
 - `paks.py`  
   Core implementation of the pattern-based kernel search algorithm.  
 
-- `paks_configs.py` 
+- `configs.py` 
   Defines configuration dictionaries.  
   - default_configuration: parameters described in **Table 3** of the manuscript.
 

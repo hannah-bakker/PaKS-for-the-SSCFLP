@@ -18,7 +18,7 @@ PaKS-for-the-SSCFLP/
 ├── logs/             # Folder that contains the logfiles produced in a run
 ├── results/          # Output files from algorithm runs
 ├── scripts/          # Executable scripts (run experiments, load instances)
-├── src/              # Source code modules (kernel_search, models, utils)
+├── src/              # Source code modules (algs, models, utils)
 ├── requirements.txt  # Python dependencies 
 ├── LICENSE           # License file 
 └── README.md         # This file
