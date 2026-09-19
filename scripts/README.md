@@ -55,7 +55,7 @@ Supported input formats are:
 The script is executed as follows:
 
 ```bash
-python load_instance.py <folder_path> <name> <test_set> [<capacity>]
+python scripts/load_instance.py <folder_path> <name> <test_set> [<capacity>]
 ```
 
 The arguments are:
