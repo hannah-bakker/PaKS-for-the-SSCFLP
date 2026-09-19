@@ -66,7 +66,7 @@ The arguments are:
 
 For example:
 ```bash
-python load_instance.py ../raw_data capa OR4 5000
+python load_instance.py ../data/raw_data capa OR4 5000
 ```
 
 This converts `capa.txt` into the unified JSON format and stores the resulting instance as:
