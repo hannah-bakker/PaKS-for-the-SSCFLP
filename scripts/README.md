@@ -17,7 +17,7 @@ The script `main.py` runs PaKS on a single SSCFLP instance using a specified alg
 The script is executed as follows:
 
 ```bash
-python main.py <path_to_instance> <config> <timelimit>
+python scripts/main.py <path_to_instance> <config> <timelimit>
 ```
 
 The arguments are:
