@@ -5,8 +5,8 @@
 This folder contains the executable Python scripts used to **run PaKS** and to **prepare benchmark instances** for the computational experiments.
 
 The folder contains two scripts:
-- `main.py` -- runs PaKS on a single SSCFLP instance
-- `load_instance.py` -- converts benchmark instances from their original formats into the unified JSON format used throughout the repository
+- `main.py` - runs PaKS on a single SSCFLP instance
+- `load_instance.py` - converts benchmark instances from their original formats into the unified JSON format used throughout the repository
 
 ---
 
@@ -21,9 +21,9 @@ python main.py <path_to_instance> <config> <timelimit>
 ```
 
 The arguments are:
-- `<path_to_instance>`-- path to the input instance in the unified JSON format
-- `<config>` -- name of the algorithm configuration defined in `src/algs/configs.py`
-- `<timelimit>` -- total time limit for the algorithm, in seconds
+- `<path_to_instance>`- path to the input instance in the unified JSON format
+- `<config>` - name of the algorithm configuration defined in `src/algs/configs.py`
+- `<timelimit>` - total time limit for the algorithm, in seconds
 
 For example:
 ```bash
@@ -59,10 +59,10 @@ python load_instance.py <folder_path> <name> <test_set> [<capacity>]
 ```
 
 The arguments are:
-- `<folder_path>` -- path to the folder containing the original instance file
-- `<name>` -- name of the instance without the file extension
-- `<test_set>` -- benchmark test set identifier (e.g., "OR4")
-- `<capacity>`-- optional facility capacity used for OR4 instances
+- `<folder_path>` - path to the folder containing the original instance file
+- `<name>` - name of the instance without the file extension
+- `<test_set>` - benchmark test set identifier (e.g., "OR4")
+- `<capacity>`- optional facility capacity used for OR4 instances
 
 For example:
 ```bash

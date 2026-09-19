@@ -6,6 +6,6 @@ This folder contains all core Python modules used to model and solve the **Singl
 
 The source code is organized into three submodules:
 
-- `algs/` -- implementation of PaKS and the corresponding algorithm configurations
-- `models/` -- instance and solution data structures, the SSCFLP model, and general MIP functionality
-- `utils/` -- helper functions and biclustering functionality used throughout the implementation
+- `algs/` - implementation of PaKS and the corresponding algorithm configurations
+- `models/` - instance and solution data structures, the SSCFLP model, and general MIP functionality
+- `utils/` - helper functions and biclustering functionality used throughout the implementation

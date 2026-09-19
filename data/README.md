@@ -37,17 +37,17 @@ The computational experiments use instances from the following benchmark dataset
 
 Each converted instance is stored as a JSON object containing two sections:
 
-- `info` -- basic instance information
-- `params` -- the numerical parameters defining the SSCFLP instance
+- `info` - basic instance information
+- `params` - the numerical parameters defining the SSCFLP instance
 
 The `params` object contains: 
 
-- `I` -- number of candidate facilities
-- `J` -- number of customers
-- `D` -- customer demands, stored as a list of length `J`
-- `Q` -- facility capacities, stored as a list of length `I`
-- `F` -- facility fixed opening costs, stored as a list of length `I`
-- `c` -- transportation costs, stored as an `I × J` matrix
+- `I` - number of candidate facilities
+- `J` - number of customers
+- `D` - customer demands, stored as a list of length `J`
+- `Q` - facility capacities, stored as a list of length `I`
+- `F` - facility fixed opening costs, stored as a list of length `I`
+- `c` - transportation costs, stored as an `I × J` matrix
 
 The provided example,  `i300_1.json`, therefore has the following structure:
 

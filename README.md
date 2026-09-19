@@ -52,9 +52,9 @@ python scripts/main.py <path_to_instance> <config> <timelimit>
 ```
 The arguments are:
 
-- `<path_to_instance>` -- path to the input instance in the unified JSON format
-- `<config>` -- name of the algorithm configuration defined in `src/algs/configs.py`
-- `<timelimit>` -- total time limit for the algorithm, in seconds
+- `<path_to_instance>` - path to the input instance in the unified JSON format
+- `<config>` - name of the algorithm configuration defined in `src/algs/configs.py`
+- `<timelimit>` - total time limit for the algorithm, in seconds
 
 For example:
 
