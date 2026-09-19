@@ -1,17 +1,11 @@
-# Utils
+# utils Module
 
-This folder provides helper modules for solution handling, clustering, and visualization tasks used across the project.
+## Overview
 
-## Folder Structure
+This module contains **general-purpose helper functions** and the **biclustering functionality** used by PaKS.
 
-- `helpers.py`  
-  General-purpose helper functions including:
-  - Timing decorators
-  - Saving and loading solutions
-  - List overlap computations (e.g., Jaccard index)
+The folder contains two modules:
 
-- `biclustering.py`  
-  Functions and classes for:
-  - Generating feature matrices from solutions
-  - Performing biclustering of facilities and customers
-  - Computing region overlap metrics (`l_inter`, `l_intra`)
+- `helpers.py` -- general utility functions for timing, storing and loading solutions, and computing overlap measures
+
+- `biclustering.py` -- functionality for constructing regions of facilities and customers from patterns observed across solutions

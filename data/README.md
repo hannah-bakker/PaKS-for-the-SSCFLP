@@ -2,17 +2,17 @@
 
 ## Overview
 
-All benchmark instances used in our computational experiments were **converted into a unified JSON format** for consistency and ease of use.
+The computational experiments use benchmark instances from three established SSCFLP test sets. To ensure a consistent input format across all datasets, the original benchmark instances are converted into a **unified JSON format** before being processed by the algorithms.
 
-As an example, this folder provides the file `i300_1.json`, which demonstrates the structure used across all instances.
+This folder contains one example instance, `i300_1.json`, illustrating the JSON structure used throughout the repository. The corresponding original benchmark file, prior to conversion into the unified JSON format, is provided in the `raw_data` folder.
 
-In addition, the folder `scripts` contains the Python script `load_instance.py`, which can be used to load instances from the different benchmark datasets and convert them into the unified JSON format.
+Additional benchmark instances can be obtained from the original sources listed below and converted using `scripts/load_instance.py`.
 
 ---
 
 ## Data Sources
 
-We used instances from three benchmark datasets, which can be accessed through the links below:
+The computational experiments use instances from the following benchmark datasets.
 
 1. **12 test instances** from the OR-Library (OR4).  
    [OR-Library CAPA-CAPC](https://people.brunel.ac.uk/~mastjjb/jeb/orlib/capinfo.html) (last accessed: 21st March 2025).
@@ -33,38 +33,60 @@ We used instances from three benchmark datasets, which can be accessed through t
 
 ---
 
-## Example File
+## Unified JSON Format
 
-The unified JSON structure contains:
+Each converted instance is stored as a JSON object containing two sections:
 
-- Basic instance metadata (e.g., name, subgroup, set)
-- Number of facilities (`I`) and customers (`J`)
-- Customer demands (`D_j`) as a list
-- Facility capacities (`Q_i`) as a list
-- Facility fixed costs (`F_i`) as a list
-- Transportation costs (`c_ij`) as a **2D list** (matrix of size `I × J`)
+- `info` -- basic instance information
+- `params` -- the numerical parameters defining the SSCFLP instance
 
-The provided example file `i300_1.json` follows this format:
+The `params` object contains: 
+
+- `I` -- number of candidate facilities
+- `J` -- number of customers
+- `D` -- customer demands, stored as a list of length `J`
+- `Q` -- facility capacities, stored as a list of length `I`
+- `F` -- facility fixed opening costs, stored as a list of length `I`
+- `c` -- transportation costs, stored as an `I × J` matrix
+
+The provided example,  `i300_1.json`, therefore has the following structure:
 
 ```json
 {
   "info": {
-    "name": "i300_1",
-    "subgroup": "TB1",
-    "set": "TBED1",
-    "path": "../data/i300_1.json"
+    "name": "i300_1"
   },
   "params": {
     "I": 300,
     "J": 300,
-    "D_j": [  ],       
-    "Q_i": [  ],        
-    "F_i": [  ],        
-    "c_ij": [             
-      [  ],
-      [  ],
-      [  ]
+    "D": [  
+      ...
+    ],       
+    "Q": [  
+      ...
+    ],        
+    "F": [  
+      ...
+    ],        
+    "c": [             
+      [...],
+      [...],
+      ...
     ]
   }
 }
 ```
+
+---
+
+## Preparing Additional Instances
+
+The repository does not include all original benchmark files. They can be downloaded from the sources listed above and converted to the unified JSON format using:
+
+```
+python scripts/load_instance.py <folder_path> <name> <test_set> [<capacity>]
+```
+
+The conversion procedure automatically reads the corresponding original benchmark format and generates the JSON representation required by the algorithms in this repository.
+
+See `scripts/README.md` for details on the arguments, supported test sets, and instance-conversion procedure.

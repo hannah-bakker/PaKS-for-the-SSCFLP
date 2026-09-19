@@ -1,0 +1,20 @@
+{
+    "inst": "i300_1",
+    "problem": "SSCFLP",
+    "I": 300,
+    "J": 300,
+    "algorithm_terminated": true,
+    "Configuration": "default",
+    "total_timelimit": 3600,
+    "status": "Solved Iteration 2",
+    "z_KS": 16555.773082,
+    "time_generate_S": 14.628437995910645,
+    "time_generate_regions": 2.3267762660980225,
+    "time_sort_variables": 0.7234044075012207,
+    "time_derive_kernel_K": 0.02680659294128418,
+    "time_derive_buckets_Bcal": 0.015902042388916016,
+    "time_preprocessing": 17.723270654678345,
+    "time_solve_MIP_K": 600.7555468082428,
+    "time_improvement": 2987.281021118164,
+    "time_run_kernel_search": 3605.762439966202
+}

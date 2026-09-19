@@ -13,7 +13,8 @@ Usage:
     python load_instance.py <folder_path> <name> <test_set> [<capacity>]
 
 Example:
-    python load_instance.py ../raw_data capa OR4 5000
+    python load_instance.py ../data/raw_data capa OR4 5000
+    python load_instance.py ../data/raw_data i300_1 TBED1
 """
 
 import os
@@ -37,10 +38,10 @@ def convert(folder_path, name, test_set, capacity=0):
     params = {
         "I": 0,
         "J": 0,
-        "D_j": [],
-        "Q_i": [],
-        "F_i": [],
-        "c_ij": []
+        "D": [],
+        "Q": [],
+        "F": [],
+        "c": []
     }
 
     if test_set == "OR4":
@@ -61,13 +62,13 @@ def convert(folder_path, name, test_set, capacity=0):
                 elif 1 <= line_counter <= params["I"]:
                     # Facility data: fixed capacity and opening cost
                     Q_i_value, F_i_value = line.split()
-                    params["Q_i"].append(float(capacity))  # Overwrite Q_i by user-specified capacity
-                    params["F_i"].append(float(F_i_value))
+                    params["Q"].append(float(capacity))  # Overwrite Q_i by user-specified capacity
+                    params["F"].append(float(F_i_value))
                 elif line_counter > params["I"]:
                     # Demand and transportation costs
-                    if len(params["D_j"]) < j + 1:
+                    if len(params["D"]) < j + 1:
                         D = float(line.split()[0])
-                        params["D_j"].append(D)
+                        params["D"].append(D)
                     else:
                         cost_column.extend(map(float, line.split()))
                         if len(cost_column) == params["I"]:
@@ -77,9 +78,9 @@ def convert(folder_path, name, test_set, capacity=0):
                 line_counter += 1
 
             # Normalize transportation costs by demand
-            c_ij = c_ij / np.array(params["D_j"])
+            c_ij = c_ij / np.array(params["D"])
             c_ij = np.round(c_ij, 8)
-            params["c_ij"] = c_ij.tolist()
+            params["c"] = c_ij.tolist()
 
     else:
         input_file = os.path.join(folder_path, name + ".plc")
@@ -97,19 +98,19 @@ def convert(folder_path, name, test_set, capacity=0):
                     params["J"] = int(parts[0])
                 else:
                     # Read demands, capacities, fixed costs, and transportation costs sequentially
-                    if len(params["D_j"]) < params["J"]:
-                        params["D_j"].extend(map(float, line.split()))
-                    elif len(params["Q_i"]) < params["I"]:
-                        params["Q_i"].extend(map(float, line.split()))
-                    elif len(params["F_i"]) < params["I"]:
-                        params["F_i"].extend(map(float, line.split()))
+                    if len(params["D"]) < params["J"]:
+                        params["D"].extend(map(float, line.split()))
+                    elif len(params["Q"]) < params["I"]:
+                        params["Q"].extend(map(float, line.split()))
+                    elif len(params["F"]) < params["I"]:
+                        params["F"].extend(map(float, line.split()))
                     else:
-                        params["c_ij"].extend(map(float, line.split()))
+                        params["c"].extend(map(float, line.split()))
                 line_counter += 1
 
             # Reshape transportation cost list into a 2D array
-            array = np.array(params["c_ij"])
-            params["c_ij"] = array.reshape(params["I"], params["J"]).tolist()
+            array = np.array(params["c"])
+            params["c"] = array.reshape(params["I"], params["J"]).tolist()
 
     # Create the final instance dictionary
     instance = {
@@ -122,7 +123,7 @@ def convert(folder_path, name, test_set, capacity=0):
     # Ensure output folder exists
     output_folder = os.path.join(os.path.dirname(__file__), "../data")
     os.makedirs(output_folder, exist_ok=True)
-    
+
     output_path = os.path.join(output_folder, name + ".json")
     with open(output_path, "w") as outfile:
         json.dump(instance, outfile, indent=4)

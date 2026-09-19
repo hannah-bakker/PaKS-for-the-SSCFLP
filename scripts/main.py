@@ -1,5 +1,6 @@
 ## -*- coding: utf-8 -*-
-# python main.py "../data/i300_1.json" default 3600     
+# python main.py "../data/i300_1.json" default 600    
+
 import os
 import sys
 from datetime import datetime
@@ -29,7 +30,7 @@ from models.instance import Instance
 from models.sscflp import SSCFLP
 from models.cb_report import IntermediateReportingCallback as CB
 from algs.paks import PaKS
-from algs.configs import default
+from algs import configs
 
 warnings.filterwarnings(
     "ignore",
@@ -86,8 +87,16 @@ def setup_logging() -> logging.Logger:
 logger = setup_logging()
 
 def _map_config(cfg: str):
-    if cfg == "default": return dict(default)
-    raise ValueError(f"Unknown config '{cfg}'.")
+    """Return a copy of the requested configuration."""
+    try:
+        configuration = getattr(configs, cfg)
+    except AttributeError:
+        raise ValueError(f"Unknown config '{cfg}'.")
+
+    if not isinstance(configuration, dict):
+        raise ValueError(f"Configuration '{cfg}' is not a dictionary.")
+
+    return dict(configuration)
 
 # -------------------------------
 # Core logic
@@ -121,8 +130,6 @@ def run_instance(path_to_instance: str, config: str, timelimit: int) -> str:
     params = inst.data.get("params", {})
     data = {
         "inst": name,
-        "set": info.get("set", ""),
-        "subgroup": info.get("subgroup", ""),
         "problem": getattr(SSCFLP, "NAME", "SSCFLP"),
         "I": params.get("I"),
         "J": params.get("J"),

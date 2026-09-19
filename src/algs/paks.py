@@ -127,9 +127,8 @@ class PaKS():
         if self.logger: self.logger.info("Generated set of solutions.")   
         self.check_time()
         
-        if self.configuration["name"] == "PaKS":
-            self.generate_regions()
-            self.check_time()
+        self.generate_regions()
+        self.check_time()
         
         self.sort_variables()
         self.check_time()
@@ -151,13 +150,8 @@ class PaKS():
         self.model = self.problem(self.instance)  
         
         # Generate initial solutions based on the configuration
-        if self.configuration["name"] == "KS14":
-             self._generate_initial_LP_relaxation()
-        elif self.configuration["name"] == "PaKS":
-             self._generate_solution_set()
-        else:
-             raise ValueError(f"Unknown configuration name: {self.configuration['name']}")
-
+        self._generate_solution_set()
+        
         # Check feasibility of the LP relaxation solution
         self.time_generate_LP_0 = self.S[0].data["time"]
         
@@ -222,8 +216,10 @@ class PaKS():
         # ------------------------------------------------------------------
         if num_solutions == 1:
             weights = np.array([1.0])
+        elif self.configuration["lambda"] == "(1,N^-1,...,N^-1)":
+            weights = np.array([1.0] + [1.0 / (num_solutions - 1)] * (num_solutions - 1))  
         else:
-            weights = np.array([1.0] + [1.0 / (num_solutions - 1)] * (num_solutions - 1))    
+            raise ValueError("Unsupported lambda configuration")
         
         # Facility and customer index ranges
         I_keys = np.arange(self.instance.data["params"]["I"])
@@ -321,16 +317,15 @@ class PaKS():
         # =============================================================================
         # Transportation cost threshold (PaKS only)
         # =============================================================================
-        if self.configuration["name"] == "PaKS":
-            # Compute per-customer median transportation cost
-            c_matrix = np.array(self.instance.data["params"]["c"])
-            cost_thresholds = np.percentile(c_matrix, 50, axis=0)   # vector of size |J|
-            self.sorted_transport =  {
-                        (i, j)
-                        for i in range(self.instance.data["params"]["I"])
-                        for j in range(self.instance.data["params"]["J"])
-                        if c_matrix[i, j] < cost_thresholds[j]
-            }
+        # Compute per-customer median transportation cost
+        c_matrix = np.array(self.instance.data["params"]["c"])
+        cost_thresholds = np.percentile(c_matrix, 50, axis=0)   # vector of size |J|
+        self.sorted_transport =  {
+                    (i, j)
+                    for i in range(self.instance.data["params"]["I"])
+                    for j in range(self.instance.data["params"]["J"])
+                    if c_matrix[i, j] < cost_thresholds[j]
+        }
         # -----------------------------------------------------------------------------
         # Logging
         # -----------------------------------------------------------------------------
@@ -358,36 +353,33 @@ class PaKS():
         """
         K_x: list[tuple[int, int]] = []    
         
-        if self.configuration["name"] == "PaKS":
-           # Region-wise selection of x_ij
-           for R in self.Rcal.values():
-                I_R = [i for i in Y if i in R[0]]
-                if not I_R:
-                    continue
+        # Region-wise selection of x_ij
+        for R in self.Rcal.values():
+            I_R = [i for i in Y if i in R[0]]
+            if not I_R:
+                continue
 
-                # Inner-regional allocations: i in I_R, j in region's customer set,
-                # and (i, j) passes the reduced-cost filter.
-                inner_allocations = [
-                    (i, j)
-                    for i in I_R
-                    for j in R[1]
-                    if (i, j) in self.sorted_red_costs
-                ]
-                K_x.extend(inner_allocations)
-        
-                # Grey zone around region:
-                # x_ij with i in I_R and (i, j) selected both by reduced cost
-                # and transport-cost criteria.
-                I_R_set = set(I_R)
-                K_x.extend(
-                    ij
-                    for ij in self.sorted_red_costs
-                    if ij[0] in I_R_set and ij in self.sorted_transport
-                )
+            # Inner-regional allocations: i in I_R, j in region's customer set,
+            # and (i, j) passes the reduced-cost filter.
+            inner_allocations = [
+                (i, j)
+                for i in I_R
+                for j in R[1]
+                if (i, j) in self.sorted_red_costs
+            ]
+            K_x.extend(inner_allocations)
+    
+            # Grey zone around region:
+            # x_ij with i in I_R and (i, j) selected both by reduced cost
+            # and transport-cost criteria.
+            I_R_set = set(I_R)
+            K_x.extend(
+                ij
+                for ij in self.sorted_red_costs
+                if ij[0] in I_R_set and ij in self.sorted_transport
+            )
           
-        elif self.configuration["name"] == "KS14":
-            # KS14: all promising (i, j) arcs (by reduced cost) starting from facilities in Y
-            K_x = [ij for ij in self.sorted_red_costs if ij[0] in Y]
+        
 
         # Remove duplicates (e.g., if arcs were added via multiple paths)
         return list(set(K_x))    
@@ -407,25 +399,16 @@ class PaKS():
         # ------------------------------------------------------------------
         # Step 1: derive kernel y-variables
         # ------------------------------------------------------------------
-        if self.configuration["name"] == "KS14":
-            # KS14: kernel = all facilities with y_i > 0 in the initial LP relaxation
-            self.K["y"] = [
-                i for i in sorted_I
-                if self.S[0].data["dvars"]["y"][i] > 0
-            ]
-                 
-        elif self.configuration["name"] == "PaKS":
-            # PaKS: region-wise selection
-            # For each region R:
-            #   - count how many facilities are open in the initial LP,
-            #   - take that many facilities from the region's sorted list. 
-            for R in self.Rcal.values():
-                I_R = set(R[0])  # facilities in region r_index
-                m_R = sum(
-                    1 for i in I_R if self.S[0].data["dvars"]["y"][i] > 0
-                )
-                sorted_I_R = [i for i in sorted_I if i in I_R]
-                self.K["y"].extend(sorted_I_R[:m_R])                            
+        # For each region R:
+        #   - count how many facilities are open in the initial LP,
+        #   - take that many facilities from the region's sorted list. 
+        for R in self.Rcal.values():
+            I_R = set(R[0])  # facilities in region r_index
+            m_R = sum(
+                1 for i in I_R if self.S[0].data["dvars"]["y"][i] > 0
+            )
+            sorted_I_R = [i for i in sorted_I if i in I_R]
+            self.K["y"].extend(sorted_I_R[:m_R])                            
         
         # Store size of initial kernel
         self.len_initial_kernel = len(self.K["y"])
@@ -456,22 +439,12 @@ class PaKS():
         # =============================================================================
         # Step 1: determine bucket contents for y-variables
         # =============================================================================
-        if self.configuration["name"] == "KS14":
-            # KS14: fixed bucket size equal to initial kernel size
-            self.length_bucket_y = self.len_initial_kernel
-            bucket_indices_y = [
-                self.unassigned_Y_i[i : i + self.length_bucket_y]
-                for i in range(0, len(self.unassigned_Y_i), self.length_bucket_y)
-            ]
-        
-        elif self.configuration["name"] == "PaKS":
-            # PaKS: one bucket per region containing its unassigned facilities
-            bucket_indices_y = []
-            for R in self.Rcal.values():
-                # Unassigned facilities in region r_index
-                bucket = [i for i in R[0] if i in set(self.unassigned_Y_i)]
-                if bucket:
-                    bucket_indices_y.append(bucket)
+        bucket_indices_y = []
+        for R in self.Rcal.values():
+            # Unassigned facilities in region r_index
+            bucket = [i for i in R[0] if i in set(self.unassigned_Y_i)]
+            if bucket:
+                bucket_indices_y.append(bucket)
 
         # Track all facilities that end up in the kernel or in a bucket (for logging)
         assigned_y = list(self.K["y"])
@@ -494,16 +467,7 @@ class PaKS():
         self.Bcal = {
             h: {"y": bucket_indices_y[h], "x": bucket_indices_x[h]}
             for h in range(len(bucket_indices_y))
-        }
-    
-        # For KS14, verify that every facility is either in the kernel or exactly one bucket
-        if self.configuration["name"] == "KS14":
-            total_assigned = len(self.K["y"]) + sum(
-                len(B["y"]) for B in self.Bcal.values()
-            )
-            assert (
-                total_assigned == self.instance.data["params"]["I"]
-            ), "Not all y-variables have been assigned to a bucket."
+        }       
 
         # Number of buckets
         self.NB = len(self.Bcal)
@@ -849,45 +813,9 @@ class PaKS():
                 "Configuration":                self.configuration["name"],
                 "total_timelimit":              self.configuration["total_timelimit"],
                 "status":                       self.status,
-                # objectives
-                "z_LP_0":                       self.z_LP_0,
-                #info on solution
                 "z_KS" :                        self.z_H, #objective value 
-                 "z_H_per_iteration":           self.z_H_per_iteration,
-             #   "I_KS":                         self.I_KS,                  # facilities operating in KS final solution
-                "len(I_KS)":                    len(self.I_KS),             # number of facilities operating in KS final solution
-                #info on search process
-                "len_S":                        len(self.S),                # number of solutions in initial set
-                "N_suggested":                  self.model.N_suggested,
-                "N":                            self.model.N,                
-                "m":                            self.len_initial_kernel,                     # variables in initial kernel 
-              #  "I_K":                          self.I_K,                   # facilities operating in initial kernel solution
-                "len(I_K)":                     len(self.I_K),              # number of facilities operating in initial kernel solution
-                "NB":                           self.NB,                    # parameter NB - how many restricted MIPs were to be solved                
-                "NB_improvements":              self.num_iterations_with_improvement,       # for how many of these rounds were there actual improvements?
-                "iterations_with_improvements": self.iterations_with_improvements, # during which iterations did the improvements occur
-                "iterations_with_change_in_I_KS": self.iterations_with_change_in_I_KS, # during which iterations did the facilities actually change?
-                "MIPs_solved":                  self.MIPs_solved,            # how many MIPs were solved in total?
-                "optimally_solved":             self.optimally_solved,     # for how many of the MIPs did we find the optimal solution, for how many
-                "mipgap_per_MIP":               self.mipgap_per_MIP,        # list of MIP gaps for individual MIPs
-                "bucket_size_y":                0,
-                "bucket_size_x":                0,
-                "bucket_size_y_avg":            0,
-                "bucket_size_x_avg":            0,        
-                "r":                            self.model.r,   
-                "added_special_constraint":     self.model.added_special_constraint,
-                "VI_iterations":    self.model.VI_iterations,      
-                }
-        # =============================================================================
-        # Retrieve number of variables (x and y) in kernel and buckets.       
-        # =============================================================================
-        if "y" in self.K:
-            KPIs["bucket_size_y"] = [len(B["y"]) for B in self.Bcal.values()]
-            KPIs["bucket_size_x"] = [len(B["x"]) for B in self.Bcal.values()]
-            KPIs["bucket_size_y_avg"]  = np.mean(KPIs["bucket_size_y"]) # Get average siye     
-            KPIs["bucket_size_x_avg"] = np.mean(KPIs["bucket_size_x"] )
+        }                                
         KPIs.update(self.method_times)
-        KPIs.update(self.model.LP_times)
         if self.data is not None:
             
             self.data.update(KPIs)
