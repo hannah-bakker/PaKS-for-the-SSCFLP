@@ -13,8 +13,8 @@ Usage:
     python load_instance.py <folder_path> <name> <test_set> [<capacity>]
 
 Example:
-    python load_instance.py ../data/raw_data capa OR4 5000
-    python load_instance.py ../data/raw_data i300_1 TBED1
+    python scripts/load_instance.py data/raw_data capa OR4 5000
+    python scripts/load_instance.py data/raw_data i300_1 TBED1
 """
 
 import os

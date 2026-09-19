@@ -27,7 +27,7 @@ The arguments are:
 
 For example:
 ```bash
-python main.py ../data/i300_1.json default 3600
+python scripts/main.py data/i300_1.json default 3600
 ```
 
 This runs PaKS on instance `i300_1.json` using the `default` configuration and a time limit of 3600 seconds.
@@ -66,7 +66,7 @@ The arguments are:
 
 For example:
 ```bash
-python load_instance.py ../data/raw_data capa OR4 5000
+python scripts/load_instance.py data/raw_data i300_1 TB-1
 ```
 
 This converts `capa.txt` into the unified JSON format and stores the resulting instance as:

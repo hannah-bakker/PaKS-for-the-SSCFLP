@@ -1,5 +1,5 @@
 ## -*- coding: utf-8 -*-
-# python main.py "../data/i300_1.json" default 600    
+# python scripts/main.py "data/i300_1.json" default 600    
 
 import os
 import sys
