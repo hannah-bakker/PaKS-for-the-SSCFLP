@@ -69,8 +69,8 @@ For example:
 python scripts/load_instance.py data/raw_data i300_1 TB-1
 ```
 
-This converts `capa.txt` into the unified JSON format and stores the resulting instance as:
+This converts `i300_1.plc` from text_set=TB-1 into the unified JSON format and stores the resulting instance as:
 
-`data/capa.json`
+`data/i300_1.json`
 
 See `data/README.md` for information on the benchmark datasets and the unified JSON structure.
