@@ -61,7 +61,7 @@ python scripts/load_instance.py <folder_path> <name> <test_set> [<capacity>]
 The arguments are:
 - `<folder_path>` - path to the folder containing the original instance file
 - `<name>` - name of the instance without the file extension
-- `<test_set>` - benchmark test set identifier (e.g., "OR4")
+- `<test_set>` - benchmark test set identifier (use "OR4" for the OR-Library instances.; any other value is interpreted as an instance in the common `.plc` format used by the remaining benchmark sets)
 - `<capacity>`- optional facility capacity used for OR4 instances
 
 For example:
